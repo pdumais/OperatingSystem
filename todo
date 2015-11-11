@@ -1,0 +1,52 @@
+- heap: buddy alloc. How to make it work with pages
+
+------------ To do later -------------------------------
+- serial port: can feed console like keyboard, could make a separate flush function
+
+- kernel safe-linked-list. use for console list
+- hexedit: accessing a privileged address will make it crash. 
+    Should trap the exception to prevent it? 
+    or should request to OS if it is permited?
+- fat32 driver
+- currently, ring3 apps can access kernel mem since kernel mem is not protected.
+- block cache: the block cache is not multi-cpu friendly (see doc/blockcache)
+    would need a test suite to handle all normal cases and concurrency cases
+- memory pool: use it in block cache
+- IRQ sharing is inneficient: ie: rtl8139 loops trhough 32 devices and checks ISR
+    should stop looping when seeing first empty device and and should check ISR faster
+- should reclaim stack memory after the stack grew and process dont use it anymore
+    just check current RSP and delete all pages below it?
+- netcard driver is not multithread/multicpu safe
+- remake "getTicksSinceBoot" function: use rdtsc
+- kernel pages should have global flag to avoid polluting the TLB
+- Possible bugs:
+    -   If a process has two virt page that maps to the same phys and the thread dies,
+        we will free all pages. But if we free the first mapping, then another CPU maps it
+        when we arrive at the second mapping we will free it again, so other thread will lose it
+    - creating more consoles than what is allowed has no error handling
+
+============ bare metal x86_64 OS ===========================
+Specifications:
+    disk is a raw image with no MBR or partition
+    paging uses identity mapping of the 128 first mb with 2mb pages
+      and gig256-260 map to 0g-4g  
+    supports ring3 user threads and ring0 kernel threads
+    supports multiprocessors
+    supports APIC, and not PIC
+    supports PCID and does TLB shootdowns
+    supports sending IPIs and registering custom handlers
+    supports RTL8139 netcard on PCI bus
+    on main thread:
+        pressing '0' shows mem, pressing '1' launches bootscript
+
+===================== Cool stuff to try =====================
+- TCP/IP, and telnet shell
+- usb driver
+- disk should be partitioned with MBR
+    bootloader in MBR and kernerl in partition 1   
+- virtualization (nested virtualization??)
+
+===========================================
+
+
+

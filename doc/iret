@@ -1,0 +1,22 @@
+(error)
+rip
+cs
+eflags
+rsp
+ss
+IF return code segment selector RPL < CPL then #GP
+IF return code segment selector RPL > CPL
+    IF stack segment selector is NULL then #GP
+    IF stack segment selector RPL != RPL of the return code segment selector 
+        or the stack segment descriptor does not indicate a a writable data segment 
+        or the stack segment DPL != RPL of the return code segment selector then #GP
+    FOR each of segment register (ES, FS, GS, and DS)
+        IF (segment register points to data || non-conforming code segment)
+         && CPL > segment descriptor DPL 
+            (* Segment register invalid *)
+            SegmentSelector = 0; 
+        FI;
+    ROF;   
+ 
+
+

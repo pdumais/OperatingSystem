@@ -1,0 +1,21 @@
+http://www.osdever.net/tutorials.php?cat=8&sort=1
+gdb:
+    start qemu: qemu-system-x86_64 -S -s image/disk.img
+    gdb: target remote :1234
+    breakpoint: br *0x00000000
+    gdb step next instruction: si
+
+
+dump machine mem:
+    in qemu monitor console: 
+
+
+calling convention for C:
+    The first six integer or pointer arguments are passed in registers RDI, RSI, RDX, RCX, R8, and R9, while XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6 and XMM7 are used for floating point arguments
+
+
+qemu: get info on triple fault:
+    -d int,cpu_reset -nogrpahic -no-reboot
+
+disasm:
+objdump -D -b binary -mi386 -M x86-64 image/disk.img

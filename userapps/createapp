@@ -1,0 +1,5 @@
+#!/bin/sh
+
+mkdir $1
+cp Makefile.skel $1/Makefile
+sed -i "s/\*\*TARGET\*\*/$1/g" $1/Makefile

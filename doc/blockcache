@@ -1,0 +1,59 @@
+It would be more simple if atahandler would set pendingRequest[channel].pending at the end of the handler
+    and callback could not call schedule_io. It needs to find a better way
+        second callback to say its over?
+            but it would be simpler if it wasnt called from the IRQ thread
+
+--------------- How it works right now ------------------
+getCacheEntry is called by block_read and block_write
+    it decides if it returns a new block or an existing one.
+
+clearCache is called by block_read and block_write
+    it will be called if getCacheEntry could not return anything
+
+============= Should implement those states:
+States:
+    free                                ; block not associated to block on disk
+    reserved for new write creation     ; block not free, user will write data in it
+    reserved for new read creation      ; block not free, will schedule it for read
+    pending read                        ; block ready to be read from disk
+    pending write                       ; block ready to be written to disk
+    pending_user_write                  ; block waiting for user to write in it
+    pending copy to user buffer         ; block contains up to date data but will be written to user buffer.
+    uptoDate                            ; block up to date and not in use by user right now.
+    writing                             ; being written to disk
+    reading                             ; being read from disk
+
+Transitions:
+    free -> reserved for new write creation             
+    free -> reserved for new read creation              
+    reserved for new write creation -> pending_user_write
+    reserved for new read creation -> pending read      
+    pending read -> pending copy to user buffer         
+    pending copy to user buffer -> uptodate             
+    pending_user_write -> pending write
+    pending write -> writing
+    writing -> uptodate                           
+    pending write -> pending copy to user buffer        !!! will not be picked up by scheduler
+    writing -> pending copy to user buffer              !!! IRQ will get confused.
+    pending copy to user buffer -> uptodate             
+    uptodate -> pending copy to user buffer             
+    uptodate -> pending_user_write                      
+    uptoDate -> free                                    
+
+Code:
+- function to changestate
+    atomically change state and validate state transition is ok
+
+- getCacheEntry: 
+    changeState to reserved_write/reserved_read/pending_user_write/pending_read
+        that function will validate the state change
+    
+- clearCache:
+    changeState to free
+        that function will validate the state change atomically
+
+- getFirstPending
+        ignore writing and reading blocks. 
+            mark it as reading/writing. !!!! No! What if ata_read/write returned false
+- ata_read / ata_write -> set InUse and return false if it was already in use
+    

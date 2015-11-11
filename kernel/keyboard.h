@@ -1,0 +1,30 @@
+#define KEY_F1 256
+#define KEY_F2 257
+#define KEY_F3 258
+#define KEY_F4 259
+#define KEY_F5 260
+#define KEY_F6 261
+#define KEY_F7 262
+#define KEY_F8 263
+#define KEY_F9 264
+#define KEY_F10 265
+#define KEY_F11 266
+#define KEY_F12 267
+
+#define KEY_CTRL_0 268
+#define KEY_CTRL_1 269
+#define KEY_CTRL_2 270
+#define KEY_CTRL_3 271
+#define KEY_CTRL_4 272
+#define KEY_CTRL_5 273
+#define KEY_CTRL_6 274
+#define KEY_CTRL_7 275
+#define KEY_CTRL_8 276
+#define KEY_CTRL_9 277
+
+#define KEY_PGUP   278
+#define KEY_PGDOWN 279
+#define KEY_UP 280
+#define KEY_DOWN 281
+#define KEY_LEFT 282
+#define KEY_RIGHT 283

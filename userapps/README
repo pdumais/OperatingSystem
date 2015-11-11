@@ -1,0 +1,4 @@
+to create a new app:
+    ./createApp
+
+to have laucnhed automatically add it in "bootscript"

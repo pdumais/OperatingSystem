@@ -1,0 +1,22 @@
+mutex
+{  
+    CurrentTicket=0;
+    NextTicket=0;
+
+    lock()
+        n = FetchAndIncrement(NextTicket)
+        while (n != CurrentTicket) yield;
+
+    unlock()
+        //TODO: should not do this if we don't hold the mutex right now
+        CurrentTicket++
+}
+
+if process dies and never unlocks, the count wont be increased
+    If mutex only used within same process, its no big deal
+    for pf(), the mutex is in kernel.
+        maybe we should pool the request and not let threads trigger locks in kernel
+        -- OR --
+        Each ticker should be associated to a processID and checked for existance?
+            - overhead
+            - if process frozen, we still get the deadlock

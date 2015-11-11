@@ -1,0 +1,86 @@
+#include "../memorymap.h"
+#include "macros.h"
+#include "config.h"
+#include "intA0.h"
+
+.global initIntA0
+
+initIntA0:
+    push        %rax    
+    push        %rbx
+    
+    mov         $intA0,%rbx
+    mov         $0xA0,%rax
+    call        registerTrapGate
+    
+    pop         %rbx
+    pop         %rax
+    ret
+
+
+intA0:
+    push        %r15
+    push        %r14
+    push        %r13
+    push        %r12
+    push        %r11
+    push        %r10
+    push        %r9
+    push        %r8
+    push        %rbp
+    push        %rdi
+    push        %rsi
+    push        %rdx
+    push        %rcx
+    push        %rbx
+
+    cmp         $INTA0_GET_APIC_ID,%rax
+    je          intA0_get_apic_id
+    cmp         $INTA0_KILL_CURRENT_TASK,%rax
+    je          intA0_kill_current_task
+    cmp         $INTA0_PRINTF,%rax
+    je          intA0_printf
+    cmp         $INTA0_CREATETEXTCONSOLE,%rax
+    je          intA0_createTextConsole
+    cmp         $INTA0_POLL_IN,%rax
+    je          intA0_poll_in
+    jmp         intA0_exit
+
+intA0_get_apic_id:
+    GET_APIC_ID(%eax)
+    jmp         intA0_exit
+
+intA0_kill_current_task:
+    call        removeConsole
+    call        killCurrentTask
+    jmp         intA0_exit
+
+intA0_printf:
+    call        safeWriteString
+    jmp         intA0_exit
+
+intA0_createTextConsole:
+    call        createTextConsole
+    jmp         intA0_exit
+
+intA0_poll_in:
+    call        pollChar
+    jmp         intA0_exit
+
+
+intA0_exit:
+    pop         %rbx
+    pop         %rcx
+    pop         %rdx
+    pop         %rsi
+    pop         %rdi
+    pop         %rbp
+    pop         %r8
+    pop         %r9
+    pop         %r10
+    pop         %r11
+    pop         %r12
+    pop         %r13
+    pop         %r14
+    pop         %r15
+    iretq
