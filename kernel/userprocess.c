@@ -49,6 +49,7 @@ void createUserProcess(struct UserProcessInfo* upi)
     // Create the paging structures and get the addess of the page tables
     setupProcessPageStructureForUserProcess(&upi->psi);
     upi->psi.pageTables = (uint64_t*)MIRRORAREA(upi->psi.pageTables);
+    upi->lastProgramAddress = 0;
 
     // Create the virtual mapping
     mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,STACK0TOP_VIRTUAL_ADDRESS-(0x1000*4),(uint64_t)stack0Pages,4,(1LL<<63)|(0<<2)|(1<<1));
@@ -84,6 +85,12 @@ void createUserProcess(struct UserProcessInfo* upi)
 
 }
 
+void createProcessHeap(struct UserProcessInfo* upi)
+{
+    char* pages = (char*)allocateHeapPage(1);
+    mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,(upi->lastProgramAddress+0xFFF)&~0xFFF,(uint64_t)pages,1, (1LL<<63)|(1<<2)|(1<<1));
+}
+
 void addUserProcessSection(struct UserProcessInfo* upi, char* buffer, uint64_t virtualAddress, uint64_t size, bool readonly, bool execute, bool initZero)
 {
     if (virtualAddress == USER_PROCESS_CODE_START)
@@ -108,7 +115,11 @@ void addUserProcessSection(struct UserProcessInfo* upi, char* buffer, uint64_t v
     {
         memcpy64(buffer,pages,size);
     }
+    if ((virtualAddress+(pageCount*0x1000))>upi->lastProgramAddress) upi->lastProgramAddress = virtualAddress+(pageCount*0x1000);
 }
+
+
+
 
 void setUserProcessCodeSection(struct UserProcessInfo* upi, char* buffer, uint64_t virtualAddress, uint64_t size)
 {
@@ -119,6 +130,8 @@ void setUserProcessCodeSection(struct UserProcessInfo* upi, char* buffer, uint64
     pages = (char*)MIRRORAREA(pages);
     memcpy64(buffer,(char*)&pages[USER_PROCESS_STUB_SIZE],size);
     createProcessStub(pages, upi->entryPoint);       
+
+    if ((virtualAddress+(pageCount*0x1000))>upi->lastProgramAddress) upi->lastProgramAddress = virtualAddress+(pageCount*0x1000);
 }
 
 void launchUserProcess(struct UserProcessInfo* upi)
@@ -146,7 +159,7 @@ void destroyProcessMemory(uint64_t pml4)
     {
         uint64_t phys = (uint64_t)virt2phys(virtualAddress,pml4);
         uint64_t pageFlags = phys&0x8000000000000FFF;
-        phys = phys & ~0x8000000000000FFF;;
+        phys = phys & ~0x8000000000000FFF;
         if (ISMIRROR_ADDRESS(phys)) break;                          // stop when getting mirror address
         if ((pageFlags&0b111000000000) == 0) continue;              // AVL bits cleared = page is free
         releasePhysicalPage(phys);

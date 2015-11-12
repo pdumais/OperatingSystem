@@ -12,6 +12,7 @@ struct UserProcessInfo
     char* entryPoint;
     uint64_t entryParameter;
     struct ProcessStructureInfo psi;
+    uint64_t lastProgramAddress;
 };
 
 void createUserProcess(struct UserProcessInfo*);

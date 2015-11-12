@@ -1,4 +1,11 @@
-- heap: buddy alloc. How to make it work with pages
+- malloc
+    - in createProcessHeap, create the first block:
+        make heap.S file
+        createBlock(start,size,free) -> (heapStart, heap_top, inuse=0)
+    - implement malloc
+        tests:
+            create 4k buffer, 8k buffer, 100mb buffer, 2 * 30bytes buffer
+            test rwite/read at begining, middle and end of each buffer
 
 ------------ To do later -------------------------------
 - serial port: can feed console like keyboard, could make a separate flush function
@@ -49,4 +56,84 @@ Specifications:
 ===========================================
 
 
+model:
+    heap memory is managed using a linked list of blocks. Each block start
+    with a header called the Memory Allocation Entry (MAE). A MAE is
+    128bit wide and structured as follow:
+        127:124: reserved 
+        123:68:  address of next block
+        67:1:    reserved
+        0:0:     1=in use, 0=free
+    
+    Each block are aligned on a 16byte boundary. Hence why the "next block"
+    address's lower 4bits are not used. This means that memory is allocated in 
+    16bytes multiples. The MAE occupies the first 16byte of the block.
+    So a request for a buffer of 1byte, would create a block of 32 byte: 16 for the 
+    MAE and then 16 for the buffer itself. The memory manager guarantees
+    that each allocated buffers are aligned on a 16byte boundary.
+
+    Initially, on process creation, the heap only contains one big free block.
+    Its MAE "inuse" field is set to 0 (free), and the "next" field points to the 
+    end of the heap. The end of the heap is defined as the last virtual address 
+    that can be used by the heap, and is at the same time, the bottom of the stack
+
+    Note that since each block start with a 16byte header (the MAE), malloc
+    will return the address of the start of buffer (after the MAE) and NOT
+    the address of the block. That would be the address of the block + sizeof(MAE)
+
+Page management:
+    malloc will not allocate physical pages as it reserves memory.
+    malloc only reserves virtual memory.
+    When a task attempts to access a non-present page, a #PF will occur
+    and the page will be allocated. Regardless of wheter that address
+    is a good address that is allocated on heap. When malloc
+    creates a new MAE, it creates it in free memory (at the end of
+    the requested block). Chances are that this address resides
+    on a page that is not allocated. When writting the MAE, a #PF
+    will occur. This is the only time that malloc would trigger a physical
+    memory allocation. Note that it is not malloc that allocated the memory
+    but #PF. malloc has no idea what pages are free or not, it assumes
+    that all pages are available and that there is enough RAM to fulfill
+    all requests. The pitfall is that, for this reason, malloc does not
+    guarantee that memory is available when creating a buffer. The task
+    could request a 10mb buffer to malloc but when trying to access it,
+    a #PF might discover that no pages are available. So the process 
+    would crash.
+     
+    on process creation, a single physical page of memory is allocated for 
+    the heap. This page is created to store the first MAE.
+
+malloc
+    Malloc's job is to reserve a memory block in the linked-list. It is not
+    to allocate physical page and map them on virtual space.
+    Malloc is best described with pseudo-code:
+
+    E = firt MAE
+    L = address of MAE
+
+    WHILE (E < END_OF_HEAP)
+        if (E not aligned on 16byte) exit(heap corruption)
+        if (E.next < E) exit(heap corruption)
+
+        //TODO: where to lock?
+        IF (E.inuse == 0)
+            IF (E.next-L) >= (requestedSize+16)
+                TEMP = new MAE at location E+16+requestSize
+                    (*this may trigger a page fault)
+                TEMP.next = E.next
+                TEMP.inuse = 0
+    
+                E.next = TEMP
+                E.inuse = 1
+
+                exit(address of E + 16)
+            FI
+        FI
+
+        E = E.next
+    ELIHW
+
+free: TODO:
+    - merge two blocks
+    - free phys pages
 

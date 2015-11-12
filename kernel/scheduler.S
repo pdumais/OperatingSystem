@@ -281,6 +281,7 @@ createProcessStub:
 // THIS SHOULD NEVER GROW ABOVE 512 BYTES!
 userProcessLaunchStub:
     push    %rdi
+
     // Create a console for that process
     mov     $INTA0_CREATETEXTCONSOLE,%rax
     int     $0xA0

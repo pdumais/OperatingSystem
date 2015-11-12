@@ -115,6 +115,7 @@ void loadUserApplications(uint64_t device)
             addUserProcessSection(&upi,&elfBuffer[sh->offsetInFile], sh->virtualAddress, sh->size, readOnly, executable, initZero);
         }
 
+        createProcessHeap(&upi);
         launchUserProcess(&upi);
         param++;
     }

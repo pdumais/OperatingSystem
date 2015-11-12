@@ -198,6 +198,29 @@ exceptionDHandler:
 //  In here, we will try to recover from the fault by allocating a page
 //  for the offending virtual address if it is for stack. Otherwise, let
 //  thread crash.
+//
+//  The page fault handler is not the most efficient one. It blindly allocates
+//  a physical page to unallocated virtual addresses. The only thing it checks
+//  is if the address resides in the page guard between heap and stack.
+//  This should be modified to detect if a heap operation overflowed
+//  on the stack or if a stack operation overflowed in the heap.
+//  We should also make sure that a page fault in the heap for an
+//  address that is not part of a "isuse" block does not get allocated.
+//  Problems with this algorithm:
+//      - Touching memory below the guard page while trying to access memory
+//        (stack overflow) will allocate a page in heap. And we wont track it.
+//        ie: char test[(1024*1024*20)+4097]; test[0]=1;
+//      - Touching memory above the guard page during heap operation will
+//        allocate a page in stack. ie: char* c = malloc(X); c[10000]=1
+//        where c+10000 would be in the stack.
+//      - Pages allocated in stack will not be freed until the process dies.
+//        so if a large buffer was created initially and not touched for
+//        the rest of program execution, a lot of pages will be allocated for
+//        nothing.
+//      - Touching heap memory outside of a buffer created with malloc will
+//        create a page and it won't be freed until the process dies.
+//
+//  For these reasons we should do some garbage collecting of some sort.
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 .align 16
@@ -207,32 +230,38 @@ exceptionEHandler:
     push        %rax
     push        %rdi
     push        %rbx
-    push        %rcx
 
-    // If the #PF was caused by a user thread accessing its stack
-    // then we should grow its stack. 
-    // 1) Check the error code pushed on the stack to see if 
+    // Check the error code pushed on the stack.
+    // If the page was already present, then this is a permission error
+    // Dont check if it was a user access because maybe the buffer was passed
+    // to a system call. 
     mov         (%rbp),%rax
-    and         $0b111,%rax
-    cmp         $0b110,%rax   // Cause by a write to non present page by user mode thread?
-    jnz         failPF
+    bt          $0,%rax
+    jc          failPF
 
-    // 2) check that the offending address resides in a free page
+    // Make sure that the address is within stack range or heap range
+    // because these are the only two areas where we dynamically 
+    // allocate pages
     mov         %cr2,%rax
-    mov         %rax,%rdi
-    call        getPTEntry
-    mov         (%rax),%rbx         // rax = PTE for faulty address
-    test        $0b111000000000,%rbx
-    jnz         failPF              // the page is not free
-    mov         %rax,%rbx
+    mov         $THREAD_CODE_START,%rbx
+    cmp         %rbx,%rax
+    jb          failPF   
+    mov         $STACK3TOP_VIRTUAL_ADDRESS,%rbx
+    cmp         %rbx,%rax
+    jae         failPF   
+    mov         $HEAP_TOP,%rbx
+    cmp         %rbx,%rax
+    jb          1f
+    mov         $STACK3BOTTOM_VIRTUAL_ADDRESS,%rbx
+    cmp         %rbx,%rax
+    jae         1f
+    jmp         failPF
 
-    // 3) check that the offending address resides in a page just below another stack page.
-    add         $0x1000,%rdi
+    // Get the PTE for that address
+1:  mov         %rax,%rdi
     call        getPTEntry
-    mov         (%rax),%rax         // rax = PTE for page just over the faulty address
-    and         $0b111000000000,%rax
-    cmp         $0b001000000000,%rax
-    jnz         failPF              // the next page is not a stack page
+    mov         (%rax),%rbx         // rax = PTE address for faulty address
+    mov         %rax,%rbx
 
     mov         $1,%rdi
     call        allocateStackPage
@@ -241,7 +270,6 @@ exceptionEHandler:
     or          $0b001000000111,%rax
     mov         %rax,(%rbx)     
 
-    pop         %rcx
     pop         %rbx
     pop         %rdi
     pop         %rax
@@ -250,7 +278,6 @@ exceptionEHandler:
     iretq
 
 failPF:
-    pop         %rcx
     pop         %rbx
     pop         %rdi
     pop         %rax
