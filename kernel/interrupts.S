@@ -265,7 +265,7 @@ exceptionEHandler:
 
     mov         $1,%rdi
     call        allocateStackPage
-    
+
     // make the mapping in the page table
     or          $0b001000000111,%rax
     mov         %rax,(%rbx)     

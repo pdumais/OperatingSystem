@@ -1,5 +1,6 @@
 #include "threads.h"
 #include "console.h"
+#include "memory.h"
 
 uint64_t testRWVar=0x123456789;
 uint64_t testBSSVar;
@@ -12,9 +13,21 @@ int meow(uint64_t tid)
 
 int main(uint64_t param)
 {
+    uint64_t i,a;
     uint16_t ch;
 
-    printf("User Thread %x  %x\r\n",param, testRWVar);
+    char* buf1 = (char*)malloc(0x10000);
+    char* buf2 = (char*)malloc(0x1);
+    char* buf3 = (char*)malloc(0x10000);
+
+//printf("--->%x  %x\r\n",(char*)&buf1[0x1ff0], virt2phys((char*)&buf1[0x1ff0]));
+//printf("\r\n");
+//buf1[0x1ff4] = 2;
+//while(1);
+    printf("User Thread %x  %x %x %x\r\n",param, buf1, buf2, buf3);
+    for (i=0;i<0x10000;i++) buf1[i] = (char)i;
+    for (i=0;i<0x1;i++)     buf2[i] = (char)i;
+    for (i=0;i<0x10000;i++) buf3[i] = (char)i;
 
     while (1)   
     {

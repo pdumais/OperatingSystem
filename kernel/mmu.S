@@ -420,6 +420,12 @@ reservePhysicalMemoryForVirtualRange:
 ////////////////////////////////////////////////////////////////////////////////////
 currentProcessVirt2phys:
     push        %rsi
+    push        %rcx
+
+    // save page offset (the lower 12bit part)
+    mov         %rdi,%rcx
+    and         $0xFFF,%rcx
+
     mov         %cr3,%rax       // virt2phys will clean the address
     mov         %rax,%rsi
     call        virt2phys
@@ -428,9 +434,14 @@ currentProcessVirt2phys:
     shr         $12,%rax
     shl         $12,%rax
     btsq        $38,%rax
+    btrq        $63,%rax        // remove the NX bit
+    add         %rcx,%rax
+    pop         %rcx
     pop         %rsi
     ret
 pageDoesNotExist:
+    pop         %rcx
+    pop         %rsi
     xor         %rax,%rax
     ret
 
@@ -458,7 +469,7 @@ virt2phys:
     add         %rbx,%rax
     mov         (%rax),%rax
     bt          $0,%rax         // check if page is present
-    jnc         pageDoesNotExist
+    jnc         pageDoesNotExist2
     shr         $12,%rax
     shl         $12,%rax
     btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
@@ -471,7 +482,7 @@ virt2phys:
     add         %rbx,%rax
     mov         (%rax),%rax
     bt          $0,%rax         // check if page is present
-    jnc         pageDoesNotExist
+    jnc         pageDoesNotExist2
     shr         $12,%rax
     shl         $12,%rax
     btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
@@ -484,7 +495,7 @@ virt2phys:
     add         %rbx,%rax
     mov         (%rax),%rax
     bt          $0,%rax         // check if page is present
-    jnc         pageDoesNotExist
+    jnc         pageDoesNotExist2
     shr         $12,%rax
     shl         $12,%rax
     btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
@@ -497,11 +508,16 @@ virt2phys:
     add         %rbx,%rax
     // rax = PT entry address
 
-    pop         %rbx
 
     mov         (%rax),%rax
+    pop         %rbx
     ret
 
+pageDoesNotExist2:  
+    xor         %rax,%rax
+    pop         %rbx
+    ret
+    
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////

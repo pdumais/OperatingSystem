@@ -187,6 +187,21 @@ createKernelThread:
     call    mapMemory
 
 
+    // create firt heap page
+    add     $0x4000,%rax        // now rax= meta page
+    movq    $KERNEL_RESERVED_END,(PROCESS_HEAP_ADDRESS-META_VIRTUAL_ADDRESS)(%rax)
+    mov     $1,%rdi
+    call    allocateHeapPage
+    push    %rax
+    mov     %rax,%rsi
+    mov     %r9,%rdi
+    btsq    $38,%rdi
+    add     $0,%rdi    // Useless but shows that the heap starts at 0x08000000 since 
+    mov     $1,%rcx   // kernel threads are not relocated.
+    call    mapMemory
+    pop     %rdi
+    btsq    $38,%rdi
+    call    init_heap
     pop     %rsi
     pop     %rdi
 
@@ -291,6 +306,7 @@ userProcessLaunchStub:
 userProcessLaunchStubAddress:
     .long   0x00  // Warning: cant use a 64bit address since this is a direct load reigster
     pop     %rdi
+
     call    %rax 
 
     mov     $INTA0_KILL_CURRENT_TASK,%rax

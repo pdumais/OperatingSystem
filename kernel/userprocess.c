@@ -20,6 +20,7 @@ extern void addTaskInList(uint64_t* pml4Address);
 extern uint64_t cleanOneDeadTask();
 extern uint64_t calculateMemoryUsage();
 extern void releasePhysicalPage(uint64_t physicalAddress);
+extern void init_heap(uint64_t physicalAddressOfHeap);
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
@@ -45,6 +46,7 @@ void createUserProcess(struct UserProcessInfo* upi)
     char* stack0Pages = (char*)allocateStackPage(5);
     char* metaPage = stack0Pages+(0x1000*4);
     char* stack3Pages = (char*)allocateStackPage(4); 
+    upi->metaPage = (char*)MIRRORAREA(stack0Pages+0x4000);
 
     // Create the paging structures and get the addess of the page tables
     setupProcessPageStructureForUserProcess(&upi->psi);
@@ -88,7 +90,10 @@ void createUserProcess(struct UserProcessInfo* upi)
 void createProcessHeap(struct UserProcessInfo* upi)
 {
     char* pages = (char*)allocateHeapPage(1);
-    mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,(upi->lastProgramAddress+0xFFF)&~0xFFF,(uint64_t)pages,1, (1LL<<63)|(1<<2)|(1<<1));
+    uint64_t virtualAddress = (upi->lastProgramAddress+0xFFF)&~0xFFF;
+    mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,virtualAddress,(uint64_t)pages,1, (1LL<<63)|(1<<2)|(1<<1));
+    init_heap(MIRRORAREA(pages));
+    *((uint64_t*)&upi->metaPage[PROCESS_HEAP_ADDRESS-META_VIRTUAL_ADDRESS]) = virtualAddress;
 }
 
 void addUserProcessSection(struct UserProcessInfo* upi, char* buffer, uint64_t virtualAddress, uint64_t size, bool readonly, bool execute, bool initZero)

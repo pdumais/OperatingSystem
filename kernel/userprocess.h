@@ -10,6 +10,7 @@ struct ProcessStructureInfo
 struct UserProcessInfo
 {
     char* entryPoint;
+    char* metaPage;
     uint64_t entryParameter;
     struct ProcessStructureInfo psi;
     uint64_t lastProgramAddress;

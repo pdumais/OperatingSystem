@@ -47,6 +47,13 @@ startKernelThread:
 // this thread serves no purpose, it's just to test if
 // I can launch a thread from another thread
 mainkernelthread:
+
+//mov $0x08000000,%rdi
+//call currentProcessVirt2phys
+//mov (%rdi),%rbx
+//mov 8(%rdi),%rcx
+//int $3
+
     call    createTextConsole
 
     mov $7,%rax

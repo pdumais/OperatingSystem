@@ -17,6 +17,7 @@ extern void rwlockWriteLock(uint64_t*);
 extern void rwlockWriteUnlock(uint64_t*);
 extern void rwlockReadLock(uint64_t*);
 extern void rwlockReadUnlock(uint64_t*);
+extern void* malloc(uint64_t size);
 
 volatile uint64_t frontLineSwitchLock;
 volatile uint64_t frontLineConsoleIndex;
@@ -343,12 +344,15 @@ void createTextConsole()
     struct ConsoleData** consoleDataPointer;
     consoleDataPointer = (struct ConsoleData**)CONSOLE_POINTER;
 
-    char* videoBuffer = (char*)userAllocPages(1);
-    struct ConsoleData* consoleInfo = (struct ConsoleData*)userAllocPages(1);
+    //char* videoBuffer = (char*)userAllocPages(1);
+    //struct ConsoleData* consoleInfo = (struct ConsoleData*)userAllocPages(1);
+    char* videoBuffer = (char*)malloc(4096);
+    struct ConsoleData* consoleInfo = (struct ConsoleData*)malloc(4096);
     *consoleDataPointer = consoleInfo;
 
     memclear64(videoBuffer,(2*80*25));
     consoleInfo->backBuffer = (char*)currentProcessVirt2phys(videoBuffer);
+    //if (consoles[0] != 0) __asm("mov %0,%%rax; int $3" : : "r"(consoleInfo->backBuffer));
     consoleInfo->streamPointer = 0;
     consoleInfo->backBufferPointer = 0;
     consoleInfo->kQueueIn = 0;
@@ -363,12 +367,13 @@ void createTextConsole()
 
     struct ConsoleData* entry = *((struct ConsoleData**)CONSOLE_POINTER);
     mutexLock(&consoleListLock);
-//TODO: must handle the case where no more consoles are available
+    //TODO: must handle the case where no more consoles are available
     for (i=0;i<MAX_CONSOLES;i++)
     {
         if (consoles[i] == 0)
         {
             consoles[i] = (struct ConsoleData*)currentProcessVirt2phys((void*)entry);
+            //__asm("mov %0,%%rax; int $3" : : "r"(consoles[i]));
             break;
         }
     }
@@ -428,6 +433,7 @@ void switchFrontLineProcessByIndex(uint64_t index)
         uint64_t oldIndex = frontLineConsoleIndex;
         memcpy64((char*)0xB8000,consoles[frontLineConsoleIndex]->backBuffer,(2*80*25));
         frontLineConsoleIndex = index;
+
     }
     else
     {
