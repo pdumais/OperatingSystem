@@ -346,8 +346,8 @@ void createTextConsole()
 
     //char* videoBuffer = (char*)userAllocPages(1);
     //struct ConsoleData* consoleInfo = (struct ConsoleData*)userAllocPages(1);
-    char* videoBuffer = (char*)malloc(4096);
-    struct ConsoleData* consoleInfo = (struct ConsoleData*)malloc(4096);
+    char* videoBuffer = (char*)malloc(4050);
+    struct ConsoleData* consoleInfo = (struct ConsoleData*)malloc(sizeof(struct ConsoleData));
     *consoleDataPointer = consoleInfo;
 
     memclear64(videoBuffer,(2*80*25));
