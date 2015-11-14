@@ -1,6 +1,3 @@
-- heap
-    - implement free
-        test deleting a buffer between two free region
 - the kernel PD and mirror table should be created once only and referenced by all process
     - 128 first megs
     - mirror
