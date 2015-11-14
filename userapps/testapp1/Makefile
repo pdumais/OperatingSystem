@@ -1,4 +1,4 @@
-TARGET=meow
+TARGET=testapp1
 SOURCES=main.c
 BINDIR=../appsbin/
 OBJECTS=$(SOURCES:%.c=%.o)

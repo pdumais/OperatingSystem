@@ -46,6 +46,8 @@ intA0:
     je          intA0_poll_in
     cmp         $INTA0_MALLOC,%rax
     je          intA0_malloc
+    cmp         $INTA0_FREE,%rax
+    je          intA0_free
     cmp         $INTA0_VIRT2PHYS,%rax
     je          intA0_virt2phys
     jmp         intA0_exit
@@ -73,6 +75,10 @@ intA0_poll_in:
 
 intA0_malloc:
     call        malloc
+    jmp         intA0_exit
+
+intA0_free:
+    call        free
     jmp         intA0_exit
 
 intA0_virt2phys:

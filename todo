@@ -1,14 +1,16 @@
 - heap
-    - test malloc:
-          create 4k buffer, 8k buffer, 100mb buffer, 2 * 30bytes buffer
-          test rwite/read at begining, middle and end of each buffer
     - implement free
+        test deleting a buffer between two free region
+- the kernel PD and mirror table should be created once only and referenced by all process
+    - 128 first megs
+    - mirror
+- remake "getTicksSinceBoot" function: use rdtsc
+    - block cache needs it for page aging
+
 
 ------------ To do later -------------------------------
+- make shell
 - serial port: can feed console like keyboard, could make a separate flush function
-- hexedit: accessing a privileged address will make it crash. 
-    Should trap the exception to prevent it? 
-    or should request to OS if it is permited?
 - fat32 driver
 - currently, ring3 apps can access kernel mem since kernel mem is not protected.
     lock kernel code, bios area, kernel data, IDT (read only)
@@ -18,12 +20,7 @@
 - memory pool: use it in block cache
 - IRQ sharing is inneficient: ie: rtl8139 loops trhough 32 devices and checks ISR
     should stop looping when seeing first empty device and and should check ISR faster
-- should reclaim unused pages such as:
-    - stack pages that are no longer used.
-        - just check current RSP and delete all pages below it?
-    - heap pages that reside in previously freed virtual memory
 - netcard driver is not multithread/multicpu safe
-- remake "getTicksSinceBoot" function: use rdtsc
 - kernel pages should have global flag to avoid polluting the TLB
 - Possible bugs:
     -   If a process has two virt page that maps to the same phys and the thread dies,
@@ -32,6 +29,7 @@
     - creating more consoles than what is allowed has no error handling
 
 ============ bare metal x86_64 OS ===========================
+
 Specifications:
     disk is a raw image with no MBR or partition
     paging uses identity mapping of the 128 first mb with 2mb pages
@@ -53,4 +51,52 @@ Specifications:
 - virtualization (nested virtualization??)
 
 ===========================================
+
+MEMORY MANAGEMENT
+right now malloc reserves virt mem and phys is mapped on #pf only. there
+is no free block reaping after free. pages freed after process death
+need better system:
+
+- should reclaim unused pages such as:
+    a low-priority task than scavenges unused pages.
+    The task would go through all processes and invoke:
+        - scanvengeStack()
+        - scavengeHeap(size,F)
+            F is a function void F(start,end).
+            It will loop through the heap and find all
+            areas larger than "size" and invoke F(area_start,area_end)
+            The F function will then be able to free pages.
+    But while scavenging, the stack should not move, nor the heap!!            
+-----
+on free: 
+    tell the kernel that what range was freed and let him dealloc pages
+    OR
+    tell him what is the highest address reserved
+        - it will free pages between old highest and new highest
+        - wont work well with fragmentation
+
+on malloc:
+    tell kernel what range was allocated
+        - since pages not present, we can use other bits to indicate that this page is reserved
+        - on #PF, if page not reserved, then dont allocate it.
+    
+
+stack: *** Search for "stack page deallocation"
+    will need to scavenge.
+    when?
+        thread resume?
+        thread going to sleep?
+
+
+other concept:
+    process gets a pool of heap. It starts with, let's say, 16mb in the pool. The pages are not allocated but they are reserved
+    These are the virtual pages of the process. Since they are not present, we can use the rest of the bits to indicate that
+    they are reserved. malloc() would be implemented in userland (systemlib). It would manage the linked list.
+    It wouldn't allocate the page to phys. #PF will do that. But #PF can know if the page is reserved or not.
+    If it wasn't, then it wasn't part of the pool. If the pool needs to grow, then malloc requests that to the kernel
+    The kernel will then mark more more of these pages. 
+
+    free() would downsize the pool. But not all the time, because of fragmentation. So the kernel could reap
+    pages that are beyond the end of the pool
+
 

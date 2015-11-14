@@ -1,6 +1,7 @@
 #include "../memorymap.h"
 
 .global malloc
+.global free
 .global init_heap
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -118,7 +119,7 @@
 //     // previous and next could be in use
 //     // previous could be in use but not next
 //     // previous could be free but not next
-//     IF (PREVIOUS.inuse == 1 || PREVIOUS == VICTIM)
+//     IF (PREVIOUS.inuse == 1 || No Previous)
 //         VICTIM.inuse = 0
 //         IF (NEXT.inuse==0 && NEXT<HEAP_TOP)
 //             // --> previous in use but not next
@@ -129,7 +130,7 @@
 //         FI
 //     ELSE
 // 
-//         IF (NEXT.inuse==0 && NEXT<HEAP_TOP)
+//         IF (NEXT.inuse==0 && NEXT!=0 ) // next=0 if next==end of heap
 //             // --> previous and next ARE free
 //             PREVIOUS.next = NEXT.next
 //         ELSE
@@ -235,6 +236,101 @@ heap_corrupted:
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
+// Function: free(rdi=buffer_vritual_address)
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+free:
+    push        %rdi
+    push        %r8    
+    push        %r9
+    push        %r10
+    push        %rax
+
+    // backup 16 bytes back since the MAE is 16bytes before the buffer
+    sub         $0x10,%rdi    
+
+    // from the heap start, find the entry that has its "next" 
+    // set to the victim. This will be the "preivous" entry
+    xor         %r9,%r9
+    mov         $HEAP_TOP,%r10
+    movq        PROCESS_HEAP_ADDRESS,%rax
+    cmp         %rax,%rdi            // check if victim is the first block
+    je          2f
+1:  mov         %rax,%r9
+    cmp         %r10,%r9
+    jae         free_notfound        // if currentAddress >= HEAP_TOP
+    mov         8(%r9),%rax
+    shl         $4,%rax               // clear upper 4 bits
+    shr         $4,%rax               // clear upper 4 bits
+    cmp         %rax,%rdi
+    je          2f
+    mov         %rax,%r9
+    jmp         1b
+
+    // Now find the "next" block
+2:  mov         8(%rdi),%r8
+    shl         $4,%r8                // clear upper 4 bits
+    shr         $4,%r8                // clear upper 4 bits
+    cmp         %r10,%r8
+    jb          3f
+    xor         %r8,%r8
+
+    // At this point, we found the previous, victom and next blocks
+    // rdi=VICTIM = (address-16)
+    // r8=NEXT =  (or 0)
+    // r9=PREVIOUS = previous MAE (or 0)
+
+    // IF (PREVIOUS.inuse == 1 || No Previous)
+3:  cmp         $0,%r9
+    je          1f
+    bt          $0,(%r9)
+    jnc         takeCareOfPreviousBlock
+
+    // VICTIM.inuse = 0
+1:  btr         $0,(%rdi)
+
+    // IF (NEXT.inuse==0 && NEXT!=0)
+    cmp         $0,%r8
+    je          exitFree
+    bt          $0,(%r8)
+    jc          exitFree
+//cmp $0x6020,%di;jne 1f; int $3; 1:
+//mov (%r8),%rbx
+//int $3
+//jmp         exitFree
+    // VICTIM.next = NEXT.next
+    mov         8(%r8),%rax
+    mov         %rax,8(%rdi)
+    jmp         exitFree
+
+takeCareOfPreviousBlock:
+
+    // IF (NEXT.inuse==0 && NEXT!=0)
+    cmp         $0,%r8
+    je          1f
+    bt          $0,(%r8)
+    jnc         1f
+
+    // PREVIOUS.next = NEXT.next
+    mov         8(%r8),%rax
+    mov         %rax,8(%r9)
+    jmp         exitFree
+
+    // PREVIOUS.next = NEXT
+1:  mov         %r8,8(%r9)
+
+exitFree:
+free_notfound:
+    pop         %rax
+    pop         %r10
+    pop         %r9
+    pop         %r8
+    pop         %rdi
+    ret
+
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 // Function: init_heap(rdi=heap_phys_addr)
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
@@ -245,6 +341,7 @@ init_heap:
     mov         %rax,8(%rdi)
     pop         %rax
     ret
+
 
 
 
