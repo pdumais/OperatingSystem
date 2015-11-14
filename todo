@@ -1,6 +1,3 @@
-- the kernel PD and mirror table should be created once only and referenced by all process
-    - 128 first megs
-    - mirror
 - remake "getTicksSinceBoot" function: use rdtsc
     - block cache needs it for page aging
 
@@ -25,21 +22,6 @@
         when we arrive at the second mapping we will free it again, so other thread will lose it
     - creating more consoles than what is allowed has no error handling
 
-============ bare metal x86_64 OS ===========================
-
-Specifications:
-    disk is a raw image with no MBR or partition
-    paging uses identity mapping of the 128 first mb with 2mb pages
-      and gig256-260 map to 0g-4g  
-    supports ring3 user threads and ring0 kernel threads
-    supports multiprocessors
-    supports APIC, and not PIC
-    supports PCID and does TLB shootdowns
-    supports sending IPIs and registering custom handlers
-    supports RTL8139 netcard on PCI bus
-    on main thread:
-        pressing '0' shows mem, pressing '1' launches bootscript
-
 ===================== Cool stuff to try =====================
 - TCP/IP, and telnet shell
 - usb driver
@@ -47,9 +29,10 @@ Specifications:
     bootloader in MBR and kernerl in partition 1   
 - virtualization (nested virtualization??)
 
-===========================================
 
-MEMORY MANAGEMENT
+
+======================================================================================
+                    MEMORY MANAGEMENT
 right now malloc reserves virt mem and phys is mapped on #pf only. there
 is no free block reaping after free. pages freed after process death
 need better system:

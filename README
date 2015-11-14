@@ -1,0 +1,16 @@
+
+============ bare metal x86_64 OS ===========================
+
+Specifications:
+    disk is a raw image with no MBR or partition
+    paging uses identity mapping of the 128 first mb with 2mb pages
+      and gig256-260 map to 0g-4g  
+    supports ring3 user threads and ring0 kernel threads
+    supports multiprocessors
+    supports APIC, and not PIC
+    supports PCID and does TLB shootdowns
+    supports sending IPIs and registering custom handlers
+    supports RTL8139 netcard on PCI bus
+    on main thread:
+        pressing '0' shows mem, pressing '1' launches bootscript
+
