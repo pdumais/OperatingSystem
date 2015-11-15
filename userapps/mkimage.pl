@@ -8,6 +8,8 @@ open(my $imgFile,">","apps.bin");
 
 my $imageOffset = 0;
 my %apps;
+my $index;
+
 #get size and entry point of each bin
 for (@files)
 {
@@ -29,19 +31,44 @@ for (@files)
     $imageOffset += $paddedSize;
 }
 
-open(my $bootscriptFile,"<","bootscript");
+
+# create index sector: This is a lame file system. Just an index in the first sector
 open(my $indexFile,">:raw","index.bin");
 binmode($indexFile);
-my $pad = 0;
-while (my $appname = <$bootscriptFile>)
+my $pad = 512;
+foreach my $key (keys %apps)
 {
-    $appname =~ s/\R//g;
-    print $indexFile pack("Q",$apps{$appname}{position});
-    print $indexFile pack("Q",$apps{$appname}{size});
-    $pad += 16;
-}
+    printf $indexFile sprintf("% -32s",$key);
+#    print $indexFile ;
+    print $indexFile pack("q",$apps{$key}{position});
+    print $indexFile pack("Q",$apps{$key}{size});
 
-$pad = 512-$pad;
-print $pad;
+    $pad -= (32+8+8);
+}
 print $indexFile pack("x".$pad,0);
+
+# now copy bootscript on 2nd sector
+$size = -s "bootscript";
+$pad = 512-$size;
+open(my $bootscriptFile,"<","bootscript");
+read($bootscriptFile,my $txt, $size);
+print $indexFile $txt;
+print $indexFile pack("x".$pad,0);
+close($bootscriptFile);
+
+
+#open(my $indexFile,">:raw","index.bin");
+#binmode($indexFile);
+#my $pad = 0;
+#while (my $appname = <$bootscriptFile>)
+#{
+#    $appname =~ s/\R//g;
+#    print $indexFile pack("Q",$apps{$appname}{position});
+#    print $indexFile pack("Q",$apps{$appname}{size});
+#    $pad += 16;
+#}
+
+#$pad = 512-$pad;
+#print $pad;
+#print $indexFile pack("x".$pad,0);
 

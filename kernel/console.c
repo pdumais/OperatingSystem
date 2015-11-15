@@ -338,6 +338,18 @@ uint16_t pollChar()
     return ret;
 }
 
+
+// This will give back the console to a process that got its
+// console stolen by another process
+void restoreTextConsole(uint64_t index, uint64_t processID)
+{
+}
+
+// This will allow a process to takeover an existing console
+uint64_t stealTextConsole(uint64_t procesID)
+{
+}
+
 void createTextConsole()
 {
     uint64_t i;

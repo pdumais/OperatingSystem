@@ -12,6 +12,7 @@ struct UserProcessInfo
     char* entryPoint;
     char* metaPage;
     uint64_t entryParameter;
+    uint64_t consoleSteal;
     struct ProcessStructureInfo psi;
     uint64_t lastProgramAddress;
 };

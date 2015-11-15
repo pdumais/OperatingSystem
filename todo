@@ -1,7 +1,27 @@
-
 - make shell
-- display time in shell
+    - load app command
+        in stub:
+            if rax != 0, should call steadlconsole instead of create
+                and at then, we should return the console
 
+            - implement stealconsole:
+                find console using processid
+                change owningProcess to new
+                set CONSOLE_POINTER of current console to that console.
+                change CONSOLE_POINTER of old process to 0
+                return console index
+            - implement restore console
+                change owningProcess to the request process
+                set CONSOLE_POINTER of current console to that console.
+                change CONSOLE_POINTER of old process to 0
+                
+
+
+- "date" app
+    how to read timer? Should maintain counter?
+
+- add more details at boot: number of cpus, ip for each netcard
+- move all main thread test code to test.c
 ------------ To do later -------------------------------
 - serial port: can feed console like keyboard, could make a separate flush function
 - fat32 driver

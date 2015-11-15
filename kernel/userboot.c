@@ -10,6 +10,8 @@ extern void* kernelAllocPages(uint64_t count);
 extern void kernelReleasePages(uint64_t addr, uint64_t count);
 extern void showMem();
 
+uint64_t deviceContainingScript;
+uint64_t appParam = 0;
 
 struct __attribute__((__packed__)) ElfHeader
 {
@@ -71,56 +73,112 @@ uint8_t isValidSection(struct SectionHeader64* sh)
 }
 
 
+
+
+uint64_t loadProcess(char* name, bool createNewConsole)
+{
+    uint64_t i;
+    char index[512]; 
+    char* elfBuffer = (char*)kernelAllocPages(ELFBUFFER/4096);
+    uint64_t position = -1;
+    uint64_t size = -1;
+    uint64_t n;
+
+    block_cache_read(0,deviceContainingScript,index,1);
+
+
+    char* lbuf = (uint64_t*)&index[0];
+    for (i = 0; i < 10; i++)       // index can't contain more than 10 entries           
+    {
+        for (n=0;n<32;n++)
+        {
+            if (lbuf[n]==0x20 && name[n]==0)
+            {
+                position = *((uint64_t*)&lbuf[32]);
+                size = *((uint64_t*)&lbuf[40]);
+                break;
+            }
+            if (lbuf[n] != name[n]) break;
+
+        }
+
+        lbuf += (32+8+8);         // each index entries are 32+8+8 long
+    }
+
+    if (position == -1 || size ==-1) return 1;
+
+    position = (position>>9) + 2;
+    size = ((size+511)>>9);
+
+    if (size > (ELFBUFFER/512))
+    {
+        pf("Can't load application. Too big\r\n");
+        return;
+    }
+
+    block_cache_read(position,deviceContainingScript,elfBuffer,size);
+    struct ElfHeader *eh = (struct ElfHeader*)elfBuffer;
+
+    struct UserProcessInfo upi;
+    upi.entryPoint  = (char*)eh->programPosition;
+    upi.entryParameter = appParam;
+    if (createNewConsole)
+    {
+        upi.consoleSteal = 0; 
+    }
+    else
+    {
+        // the new process will takeover the current console
+        __asm("mov %%cr3,%0" : "=r"(upi.consoleSteal));
+    }
+    createUserProcess(&upi);    
+
+    char* sectionHeaders = elfBuffer[eh->sectionHeaderPosition];
+    for (n = 0; n < eh->sectionHeaderEntryCount; n++)
+    {
+        struct SectionHeader64* sh = (struct SectionHeader64*)&elfBuffer[eh->sectionHeaderPosition+(n*sizeof(struct SectionHeader64))];
+        if (isValidSection(sh) == 0) continue;
+
+        bool readOnly = !(sh->flags&1);
+        bool executable = (sh->flags&4);
+        bool initZero = (sh->type==8);
+    
+        addUserProcessSection(&upi,&elfBuffer[sh->offsetInFile], sh->virtualAddress, sh->size, readOnly, executable, initZero);
+    }
+
+    createProcessHeap(&upi);
+    launchUserProcess(&upi);
+    appParam++;
+
+    kernelReleasePages((uint64_t)elfBuffer,ELFBUFFER/4096);
+
+    return 0;
+}
+
 //TODO: right now, we load apps from raw disk, but we should support a file system
 void loadUserApplications(uint64_t device)
 {
     unsigned int i,n;
     uint64_t param=0;
-    char index[512]; 
-    char* elfBuffer = (char*)kernelAllocPages(ELFBUFFER/4096);
-    block_cache_read(0,device,index,1);
+    char bootscript[512]; 
 
-    uint64_t* lbuf = (uint64_t*)&index[0];
-    for (i = 0; i < (512/(8*2)); i++)
+    deviceContainingScript = device;
+
+    block_cache_read(1,device,bootscript,1);    // read bootscript
+
+    n = 0;
+    for (i = 0; i< 512; i++)
     {
-        uint64_t sector = 1+(lbuf[(i*2)+0]>>9);
-        uint64_t size = lbuf[(i*2)+1];
-        uint64_t sectorCount = (size+511)>>9;
-        if (size == 0) continue;
-        if (size > ELFBUFFER)
+        if (bootscript[i] == 0) break;
+        if (bootscript[i] == 0x0A)
         {
-            // since we don't have a malloc, we cant load big files just yet
-            pf("ERROR: Can't load app [%x]. size= %x\r\n",i,size);
+            char* name = (char*)&bootscript[n];
+            bootscript[i]=0;
+            pf("loading [%s] from bootscript\r\n",name);
+            loadProcess(name,true);
+            n = i+1;
         }
-
-        block_cache_read(sector,device,elfBuffer,sectorCount);
-
-        struct ElfHeader *eh = (struct ElfHeader*)elfBuffer;
-
-        struct UserProcessInfo upi;
-        upi.entryPoint  = (char*)eh->programPosition;
-        upi.entryParameter = param;
-        createUserProcess(&upi);    
-
-        char* sectionHeaders = elfBuffer[eh->sectionHeaderPosition];
-        for (n = 0; n < eh->sectionHeaderEntryCount; n++)
-        {
-            struct SectionHeader64* sh = (struct SectionHeader64*)&elfBuffer[eh->sectionHeaderPosition+(n*sizeof(struct SectionHeader64))];
-            if (isValidSection(sh) == 0) continue;
-
-            bool readOnly = !(sh->flags&1);
-            bool executable = (sh->flags&4);
-            bool initZero = (sh->type==8);
-
-            addUserProcessSection(&upi,&elfBuffer[sh->offsetInFile], sh->virtualAddress, sh->size, readOnly, executable, initZero);
-        }
-
-        createProcessHeap(&upi);
-        launchUserProcess(&upi);
-        param++;
     }
-
-    kernelReleasePages((uint64_t)elfBuffer,ELFBUFFER/4096);
-
 }
+
 

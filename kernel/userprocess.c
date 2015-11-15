@@ -69,7 +69,7 @@ void createUserProcess(struct UserProcessInfo* upi)
     stack[-5] = 0x08000000;                             // rip
 
     // This portion is for context restore
-    stack[-6] = 0;                                      // rax
+    stack[-6] = upi->consoleSteal;                      // rax
     stack[-7] = upi->entryParameter;                    // rdi
     stack[-8] = 0;                                      // rbx
     stack[-9] = 0;                                      // rcx

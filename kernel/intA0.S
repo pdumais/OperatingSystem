@@ -50,6 +50,8 @@ intA0:
     je          intA0_free
     cmp         $INTA0_VIRT2PHYS,%rax
     je          intA0_virt2phys
+    cmp         $INTA0_LOADPROCESS,%rax
+    je          intA0_load_process
     jmp         intA0_exit
 
 intA0_get_apic_id:
@@ -83,6 +85,10 @@ intA0_free:
 
 intA0_virt2phys:
     call        currentProcessVirt2phys
+    jmp         intA0_exit
+
+intA0_load_process:
+    call        loadProcess
     jmp         intA0_exit
 
 
