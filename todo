@@ -1,5 +1,3 @@
-- "date" app
-    should return 6 bytes and then the system lib would do all that
 - shell 'exit'
 
 ------------ To do later -------------------------------
