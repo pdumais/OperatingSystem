@@ -28,12 +28,38 @@
 .global schedule
 .global killCurrentTask
 .global cleanOneDeadTask
+.global waitProcessDeath
 .extern writeNumber
 .extern allocateStackPage
 .extern returnfromIRQ
 .extern ackAPIC
 
 .code64
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+// Function: waitProcessDeath(rdi=processID)
+// will yield the current thread until the requested process dies.
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+waitProcessDeath:
+    push        %rdi
+    push        %r15
+    push        %r14
+
+    //TODO: this is not reliable since that task ID could get recycled
+    // during a context switch and we would never notice it.
+
+1:  call        yield  
+    mov         %rdi,%r15
+    call        findTask
+    cmp         $0,%r14
+    jz          1b
+
+    pop         %r14
+    pop         %r15
+    pop         %rdi
+    ret
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
@@ -294,11 +320,27 @@ createProcessStub:
 // This code will be copied at the begining of a program memory. 
 // THIS SHOULD NEVER GROW ABOVE 512 BYTES!
 userProcessLaunchStub:
+    mov     %rsp,%rbp   
+    sub     $8,%rsp
+
+    //if stealing another console is requested, rbx = process to steal from
+    push    %rbx        
     push    %rdi
 
-    // Create a console for that process
-    mov     $INTA0_CREATETEXTCONSOLE,%rax
+    cmp     $0,%rbx
+    je      1f
+    
+    mov     %rbx,%rdi
+    mov     $INTA0_STEALTEXTCONSOLE,%rax
     int     $0xA0
+    mov     %rax,-8(%rbp)
+    jmp     2f
+
+    // Create a console for that process
+1:  mov     $INTA0_CREATETEXTCONSOLE,%rax
+    int     $0xA0
+
+2:
     // this is a "mov X,%rax". It is machine coded so that we can change the 
     // entry point address below.
     .byte   0x48,0xC7,0xC0    //mov %rax
@@ -308,7 +350,14 @@ userProcessLaunchStubAddress:
 
     call    %rax 
 
-    mov     $INTA0_KILL_CURRENT_TASK,%rax
+    pop     %rbx
+    cmp     $0,%rbx
+    je      1f
+    mov     -8(%rbp),%rdi
+    mov     $INTA0_RESTORETEXTCONSOLE,%rax
+    int     $0xA0
+
+1:  mov     $INTA0_KILL_CURRENT_TASK,%rax
     int     $0xA0
 
     // At this point, the dead bit is set. If we get preempted, 
@@ -505,11 +554,11 @@ foundOneDeadTask:
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-// Function: findCurrentTask(r15=PML4 address of requested Task)
+// Function: findTask(r15=PML4 address of requested Task)
 // return: r15=address of current task in tasklist or -1 if not found
 //         r14: 0: if address is valid
 //              1: if task not found
-//              2: if current task is a CPU park
+//              2: if task is a CPU park
 //              Errors with bit 7 set mean that the address is valid but the state
 //              of the task is not:
 //              128: if curent task is dead

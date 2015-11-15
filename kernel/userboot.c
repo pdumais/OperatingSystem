@@ -105,7 +105,7 @@ uint64_t loadProcess(char* name, bool createNewConsole)
         lbuf += (32+8+8);         // each index entries are 32+8+8 long
     }
 
-    if (position == -1 || size ==-1) return 1;
+    if (position == -1 || size ==-1) return 0;
 
     position = (position>>9) + 2;
     size = ((size+511)>>9);
@@ -152,7 +152,7 @@ uint64_t loadProcess(char* name, bool createNewConsole)
 
     kernelReleasePages((uint64_t)elfBuffer,ELFBUFFER/4096);
 
-    return 0;
+    return upi.psi.pml4;
 }
 
 //TODO: right now, we load apps from raw disk, but we should support a file system

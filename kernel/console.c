@@ -339,25 +339,11 @@ uint16_t pollChar()
 }
 
 
-// This will give back the console to a process that got its
-// console stolen by another process
-void restoreTextConsole(uint64_t index, uint64_t processID)
+struct ConsoleData* createTextConsoleForProcess()
 {
-}
-
-// This will allow a process to takeover an existing console
-uint64_t stealTextConsole(uint64_t procesID)
-{
-}
-
-void createTextConsole()
-{
-    uint64_t i;
     struct ConsoleData** consoleDataPointer;
     consoleDataPointer = (struct ConsoleData**)CONSOLE_POINTER;
 
-    //char* videoBuffer = (char*)userAllocPages(1);
-    //struct ConsoleData* consoleInfo = (struct ConsoleData*)userAllocPages(1);
     char* videoBuffer = (char*)malloc(4096); //TODO: put appropriate size
     struct ConsoleData* consoleInfo = (struct ConsoleData*)malloc(4096); //TODO: put appropriate size
     *consoleDataPointer = consoleInfo;
@@ -377,7 +363,65 @@ void createTextConsole()
     __asm("mov %%cr3,%0" : "=r"(consoleInfo->owningProcess));
     consoleInfo->owningProcess &= 0x00FFFFFFFFFFF000LL;
 
-    struct ConsoleData* entry = *((struct ConsoleData**)CONSOLE_POINTER);
+    return consoleInfo;
+
+}
+
+// This will give back the console to a process that got its
+// console stolen by another process
+void restoreTextConsole(struct ConsoleData* oldEntry)
+{
+    uint64_t i;
+    uint64_t currentProcess;
+    __asm("mov %%cr3,%0" : "=r"(currentProcess));
+    currentProcess &= 0x00FFFFFFFFFFF000LL;
+
+    mutexLock(&consoleListLock);
+    for (i=0;i<MAX_CONSOLES;i++)
+    {
+        if (consoles[i] == 0) continue;
+        if (consoles[i]->owningProcess == currentProcess)
+        {
+            memcpy64(consoles[i]->backBuffer,oldEntry->backBuffer,(2*80*25));
+            oldEntry->backBufferPointer = consoles[i]->backBufferPointer;
+            consoles[i] = oldEntry;
+            mutexUnlock(&consoleListLock);
+            return;
+        }
+    }
+    mutexUnlock(&consoleListLock);
+}
+
+// This will allow a process to takeover an existing console
+uint64_t stealTextConsole(uint64_t processID)
+{
+    uint64_t i;
+    struct ConsoleData* entry = createTextConsoleForProcess();
+    processID &= 0x00FFFFFFFFFFF000LL;
+
+    mutexLock(&consoleListLock);
+    for (i=0;i<MAX_CONSOLES;i++)
+    {
+        if (consoles[i] == 0) continue;
+        if (consoles[i]->owningProcess == processID)
+        {
+            struct ConsoleData* oldEntry = consoles[i];
+            consoles[i] = (struct ConsoleData*)currentProcessVirt2phys((void*)entry);
+            memcpy64(oldEntry->backBuffer,consoles[i]->backBuffer,(2*80*25));
+            consoles[i]->backBufferPointer = oldEntry->backBufferPointer;
+            mutexUnlock(&consoleListLock);
+            return (uint64_t)oldEntry;
+        }
+    }
+    mutexUnlock(&consoleListLock);
+    return 0;
+}
+
+void createTextConsole()
+{
+    uint64_t i;
+
+    struct ConsoleData* entry = createTextConsoleForProcess();
     mutexLock(&consoleListLock);
     //TODO: must handle the case where no more consoles are available
     for (i=0;i<MAX_CONSOLES;i++)

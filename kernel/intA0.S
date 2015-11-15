@@ -38,10 +38,16 @@ intA0:
     je          intA0_get_apic_id
     cmp         $INTA0_KILL_CURRENT_TASK,%rax
     je          intA0_kill_current_task
+    cmp         $INTA0_WAITPROCESS_DEATH,%rax
+    je          intA0_wait_process_death
     cmp         $INTA0_PRINTF,%rax
     je          intA0_printf
     cmp         $INTA0_CREATETEXTCONSOLE,%rax
     je          intA0_createTextConsole
+    cmp         $INTA0_STEALTEXTCONSOLE,%rax
+    je          intA0_stealTextConsole
+    cmp         $INTA0_RESTORETEXTCONSOLE,%rax
+    je          intA0_restoreTextConsole
     cmp         $INTA0_POLL_IN,%rax
     je          intA0_poll_in
     cmp         $INTA0_MALLOC,%rax
@@ -52,6 +58,8 @@ intA0:
     je          intA0_virt2phys
     cmp         $INTA0_LOADPROCESS,%rax
     je          intA0_load_process
+    cmp         $INTA0_GET_DATETIME,%rax
+    je          intA0_get_datetime
     jmp         intA0_exit
 
 intA0_get_apic_id:
@@ -69,6 +77,14 @@ intA0_printf:
 
 intA0_createTextConsole:
     call        createTextConsole
+    jmp         intA0_exit
+
+intA0_stealTextConsole:
+    call        stealTextConsole
+    jmp         intA0_exit
+
+intA0_restoreTextConsole:
+    call        restoreTextConsole
     jmp         intA0_exit
 
 intA0_poll_in:
@@ -89,6 +105,14 @@ intA0_virt2phys:
 
 intA0_load_process:
     call        loadProcess
+    jmp         intA0_exit
+
+intA0_wait_process_death:
+    call        waitProcessDeath
+    jmp         intA0_exit
+
+intA0_get_datetime:
+    call        getDateTime
     jmp         intA0_exit
 
 
