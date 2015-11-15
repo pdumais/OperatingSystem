@@ -56,12 +56,7 @@ getDateTime:
     movb        $' ',2(%rdi)
     add         $3,%rdi
 
-    movb        $'(',(%rdi)
-    movb        $'U',1(%rdi)
-    movb        $'T',2(%rdi)
-    movb        $'C',3(%rdi)
-    movb        $')',4(%rdi)
-    movb        $0,5(%rdi)
+    movb        $0,(%rdi)
 
     pop         %rdi
     pop         %rax

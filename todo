@@ -1,9 +1,7 @@
 - "date" app
-    adjust for time zone.
-        convert to epoch, sub 5hours and convert back (in systemlib)
+    should return 6 bytes and then the system lib would do all that
+- shell 'exit'
 
-- add more details at boot: number of cpus, ip for each netcard
-- move all main thread test code to test.c
 ------------ To do later -------------------------------
 - serial port: can feed console like keyboard, could make a separate flush function
 - fat32 driver
