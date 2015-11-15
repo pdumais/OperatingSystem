@@ -25,7 +25,6 @@
 .extern arp_getMAC
 .extern net_setIPConfig
 .extern net_setDefaultGateway
-.extern getSecondsSinceBoot
 .extern update_display
 .extern testThread
 .extern testThread2
@@ -55,6 +54,7 @@ mainkernelthread:
 //int $3
 
     call    createTextConsole
+
 
     mov $7,%rax
     mov $0,%rcx
@@ -94,6 +94,9 @@ mainkernelthread:
 1:   
     call    manageConsoles
     call    manageDeadProcesses
+
+
+
 mov $INTA0_POLL_IN,%rax
 int $0xA0
 cmp $0,%rax
@@ -117,8 +120,10 @@ jne 4f
 call testIPI
 call showIPITestResult
 4:
-
-
+cmp $'2',%al
+jne 4f
+call  testGetTicksSinceBoot
+4:
 mov $teststr,%rdi
 mov %al,(%rdi)
 mov $INTA0_PRINTF,%rax

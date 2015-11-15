@@ -11,6 +11,7 @@ extern void mutexUnlock(unsigned long mutex);
 extern uint64_t calculateMemoryUsage();
 extern void registerIPIHandler(uint64_t vector, void* handler);
 extern void sendIPI(uint64_t vector, uint64_t data,  uint64_t msgID);
+extern uint64_t getTicksSinceBoot();
 
 void testThread2()
 {
@@ -65,4 +66,9 @@ void showMem()
 void showIPITestResult()
 {
     pf("IPI: %x %x %x %x %x\r\n", cpus[0],cpus[1],cpus[2],cpus[3],cpus[4]);
+}
+
+void testGetTicksSinceBoot()
+{
+    pf("%x\r\n",getTicksSinceBoot());
 }

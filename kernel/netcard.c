@@ -19,7 +19,6 @@ extern void mutexUnlock(unsigned long*);
 extern void arp_process(struct Layer2Payload* payload);
 extern void arp_learn(struct Layer2Payload* payload);
 extern void yield();
-extern unsigned long getTicksSinceBoot();
 extern char* kernelAllocPages();
 extern unsigned int pci_getDeviceByClass(unsigned char class, unsigned char index, unsigned long* vendor, unsigned long* device);
 extern void ip_routing_addRoute(unsigned int network, unsigned int netmask, unsigned int gateway, unsigned char metric, unsigned long interface);

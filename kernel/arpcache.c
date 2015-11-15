@@ -8,8 +8,9 @@
 #define MAC_HASH_PRECISION 1024
 // if a collision occur, we will have 4 entries in that slots
 #define MAC_HASH_COLLISION 4
-#define CACHE_TIMEOUT (60*5)
-extern unsigned long getSecondsSinceBoot();
+
+//#define CACHE_TIMEOUT (60*5)
+#define CACHE_TIMEOUT 0x10000000000LL
 
 struct ArpCacheEntry
 {
@@ -31,7 +32,7 @@ unsigned long arpcache_get(unsigned int ip)
 {
     unsigned short hash = iphash(ip);
     unsigned short i;
-    unsigned long s = getSecondsSinceBoot();
+    unsigned long s = getTicksSinceBoot();   //TODO: should use accurante seconds
     unsigned long timeout = s - CACHE_TIMEOUT;
     if (s<CACHE_TIMEOUT) timeout = 0;
     for (i=0;i<MAC_HASH_COLLISION;i++)
@@ -48,7 +49,7 @@ void arpcache_put(unsigned int ip, unsigned long mac)
 {
     unsigned short hash = iphash(ip);
     unsigned short i;
-    unsigned long s = getSecondsSinceBoot();
+    unsigned long s = getTicksSinceBoot();  //TODO: should use accurante seconds
     unsigned long timeout = s - CACHE_TIMEOUT;
     if (s<CACHE_TIMEOUT) timeout = 0;
     unsigned short emptySlot = 0; // if not empty entry found, we will crush entry 0. but we should crush the oldest one instead.

@@ -23,7 +23,6 @@
 .extern arp_getMAC
 .extern net_setIPConfig
 .extern net_setDefaultGateway
-.extern getSecondsSinceBoot
 .extern update_display
 .extern initHardware
 .extern startKernelThread

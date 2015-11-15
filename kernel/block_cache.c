@@ -64,7 +64,6 @@ struct block_cache_entry* getCacheEntry(unsigned char dev, unsigned long block,
                 // the CACHE_IN_USE will prevent the block from being deleted.
                 *previousFlags = cache[i].flags;
                 cache[i].flags |= reserveFlags;
-//TODO: getTicksSinceBoot is not working anymore, should fix it.
                 cache[i].lastAccess = getTicksSinceBoot(); // That wont wrap around... trust me.
                 //STI(interruptsFlags);
 //TODO: if we locked "entry", then we should unlock it.

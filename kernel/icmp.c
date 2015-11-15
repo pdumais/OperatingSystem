@@ -5,7 +5,6 @@
 extern void memcpy64(char* src, char* dst, unsigned long size);
 extern unsigned short ip_send(unsigned long sourceInterface, unsigned int destIP, char* buf, unsigned short size, unsigned char protocol);
 extern unsigned short checksum_1complement(unsigned char* buf, unsigned short size);
-extern unsigned long getSecondsSinceBoot();
 
 // this buffer is create on heap because it would be too big for stack. It will only be used by the 
 // receive thread when replying to ping requests

@@ -1,9 +1,8 @@
-- remake "getTicksSinceBoot" function: use rdtsc
-    - block cache needs it for page aging
 
+- make shell
+- display time in shell
 
 ------------ To do later -------------------------------
-- make shell
 - serial port: can feed console like keyboard, could make a separate flush function
 - fat32 driver
 - currently, ring3 apps can access kernel mem since kernel mem is not protected.
