@@ -1,19 +1,15 @@
+
+
 - TCP stack
-    - systemlib:
-        - create functions:
-            create_socket()
-            listen(s,port,ip)
-            connect(s,port,ip)
-            read(s,buf,size)
-            write(s,buf,size)
-            accept(s)
+    - implement connect and isconnected
+    - close: should send FIN if connected
+
+    DESIGN:
     - kernel
-        - socket struct:
-            dest IP/port,src ip/port,ringbuffer,msgtype,qin/qout
         - exposed system calls:
-            create_socket()
-            listen(s,port,ip)
             connect(s,port,ip)
+            is_connected(s)
+            listen(s,port,ip)
             getMessage: get one message
             write(s,buf,size)
             acceptConnection
@@ -30,11 +26,21 @@
                   - processes will access sendbuffer directly
                   - only softirq and interrupt accesses recv queue
     - systemlib:
-        non-blocking
-        accept: will call getMessage and then call acceptConnection
+        - create functions:
+            listen(s,port,ip)
+            connect(s,port,ip)
+            read(s,buf,size)
+            write(s,buf,size)
+            accept(s)
+                will call getMessage and then call acceptConnection
+        - non-blocking
     - make telnet application
 
 - hexdump app: should be able to pass filename through command-line params
+    - should get pushed on stack?
+    - or just the pointer to string passed? but that new process
+      might not have access right to mirrorspace
+
 ------------ To do later -------------------------------
 - fat32 driver
 - serial port: can feed console like keyboard, could make a separate flush function

@@ -5,7 +5,8 @@
 #define TSS             0x00000500
 #define SOFTIRQLIST     0x00000600
 #define GDT             0x00000608
-#define RESERVED3       0x00000708
+#define SOCKETSLIST     0x00000708
+#define RESERVED3       0x00000710
 #define RESERVED3END    0x00000BFF
 #define IOAPICHANDLERS  0x00000C00      // 1k
 #define SMP_TRAMPOLINE  0x00001000      // needs to be aligned on a 4k page 

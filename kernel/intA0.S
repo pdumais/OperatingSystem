@@ -72,6 +72,14 @@ intA0:
     je          intA0_fseek
     cmp         $INTA0_FGETSIZE,%rax
     je          intA0_fgetsize
+    cmp         $INTA0_CREATE_SOCKET,%rax
+    je          intA0_create_socket
+    cmp         $INTA0_CLOSE_SOCKET,%rax
+    je          intA0_close_socket
+    cmp         $INTA0_CONNECT,%rax
+    je          intA0_connect
+    cmp         $INTA0_ISCONNECTED,%rax
+    je          intA0_isconnected
     jmp         intA0_exit
 
 intA0_get_apic_id:
@@ -79,6 +87,9 @@ intA0_get_apic_id:
     jmp         intA0_exit
 
 intA0_kill_current_task:
+    mov         %cr3,%rax
+    mov         %rax,%rdi
+    call        destroy_sockets
     call        destroyFileHandles
     call        removeConsole
     call        killCurrentTask
@@ -145,6 +156,19 @@ intA0_fseek:
     jmp         intA0_exit
 intA0_fgetsize:
     call        fgetsize
+    jmp         intA0_exit
+
+intA0_create_socket:
+    call        create_socket
+    jmp         intA0_exit
+intA0_close_socket:
+    call        close_socket
+    jmp         intA0_exit
+intA0_connect:
+    call        connect
+    jmp         intA0_exit
+intA0_isconnected:
+    call        isconnected
     jmp         intA0_exit
 
 

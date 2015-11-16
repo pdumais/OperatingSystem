@@ -49,16 +49,19 @@ void add_file_handle_to_list(file_handle* f)
 
 void remove_file_handle_from_list(file_handle* f)
 {
-    //TODO: this should lock so that it would be multi-thread safe
+    file_handle *previous = f->previous;
+    file_handle *next = f->next;
 
-    file_handle* firstHandle = *((file_handle**)FILE_HANDLE_ADDRESS);    
-    if (f->previous == 0)
+    //TODO: this should lock so that it would be multi-thread safe
+    if (previous == 0)
     {
-        *((file_handle**)FILE_HANDLE_ADDRESS) = f->next;
+        *((file_handle**)FILE_HANDLE_ADDRESS) = next;
+        if (next != 0) next->previous = 0;
     }
     else
     {
-        f->previous->next = f->next;
+        previous->next = next;
+        if (next!=0) next->previous = previous;
     }
 
 }
