@@ -1,4 +1,8 @@
-- shell 'exit'
+- must convert userboot.c code to file system usage  
+
+- where will filehandles be stored? reserve a big block of ram
+- on process death, go though all file handles and destroy them
+
 
 ------------ To do later -------------------------------
 - serial port: can feed console like keyboard, could make a separate flush function
@@ -19,6 +23,8 @@
         when we arrive at the second mapping we will free it again, so other thread will lose it
     - creating more consoles than what is allowed has no error handling
 
+- Network functions
+    provides handle
 ===================== Cool stuff to try =====================
 - TCP/IP, and telnet shell
 - usb driver

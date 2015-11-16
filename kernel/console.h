@@ -1,9 +1,11 @@
 #include "../types.h"
-
+#include "systemhandle.h"
 
 //WARNING: struct should be bigger than 4k
 struct ConsoleData
 {
+    system_handle   handle;
+
     char*       backBuffer;
     uint64_t    streamPointer; 
     uint64_t    backBufferPointer; 

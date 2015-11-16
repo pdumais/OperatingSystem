@@ -338,6 +338,13 @@ uint16_t pollChar()
     return ret;
 }
 
+void destroy_text_console_handle(system_handle* handle)
+{
+    struct ConsoleData* h = (struct ConsoleData*)handle;
+
+
+
+}
 
 struct ConsoleData* createTextConsoleForProcess()
 {
@@ -351,6 +358,7 @@ struct ConsoleData* createTextConsoleForProcess()
     memclear64(videoBuffer,(2*80*25));
     consoleInfo->backBuffer = (char*)currentProcessVirt2phys(videoBuffer);
     //if (consoles[0] != 0) __asm("mov %0,%%rax; int $3" : : "r"(consoleInfo->backBuffer));
+    consoleInfo->handle.destructor = &destroy_text_console_handle;
     consoleInfo->streamPointer = 0;
     consoleInfo->backBufferPointer = 0;
     consoleInfo->kQueueIn = 0;
