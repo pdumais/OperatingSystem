@@ -9,6 +9,14 @@
 // File path example: 01:/file.text
 
 
+// A system_handle is the base of all handles in the system. It provides a functor
+// for a destructor function. On process death, all system_handle's destructor 
+// function will be invoked to make sure that resources are cleaned appropriately.
+//
+// A file_handle contains a system_handle. When a process dies, the system_handle's 
+// destructor gets called. The kernel finds all opened file handles in a linked-list.
+// Each file_handle has a previous and next field because it is a linked-list.
+
 typedef struct
 {
     bool (*fopen)(system_handle* h, char* name, uint64_t access_type);

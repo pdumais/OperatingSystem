@@ -14,6 +14,7 @@ struct ConsoleData
     uint64_t    kQueueIn;
     uint64_t    kQueueOut;
     uint64_t    owningProcess;
+    uint64_t    previousOwningProcess;
     uint64_t    lock;
     void        (*flush_function)();
     char        ansiData[8];

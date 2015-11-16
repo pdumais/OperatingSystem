@@ -341,9 +341,7 @@ uint16_t pollChar()
 void destroy_text_console_handle(system_handle* handle)
 {
     struct ConsoleData* h = (struct ConsoleData*)handle;
-
-
-
+    restoreTextConsole(h->previousOwningProcess); 
 }
 
 struct ConsoleData* createTextConsoleForProcess()
@@ -368,6 +366,7 @@ struct ConsoleData* createTextConsoleForProcess()
     consoleInfo->ansiIndex = 0;
     consoleInfo->ansiSavedPosition = 0;
     consoleInfo->cursorOn = true;
+    consoleInfo->previousOwningProcess = 0;
     __asm("mov %%cr3,%0" : "=r"(consoleInfo->owningProcess));
     consoleInfo->owningProcess &= 0x00FFFFFFFFFFF000LL;
 
@@ -390,9 +389,41 @@ void restoreTextConsole(struct ConsoleData* oldEntry)
         if (consoles[i] == 0) continue;
         if (consoles[i]->owningProcess == currentProcess)
         {
-            memcpy64(consoles[i]->backBuffer,oldEntry->backBuffer,(2*80*25));
-            oldEntry->backBufferPointer = consoles[i]->backBufferPointer;
-            consoles[i] = oldEntry;
+            if (oldEntry == 0)
+            {
+                // TODO: by setting this to zero, we prevent keyboard handler to
+                // write ti keyboard buffer when the frontline process is still
+                // this process but its console was removed. But there is a window
+                // where the keyboard has checked for zero and writes into the buffer.
+                // if we set this to zero during that window, and we continue to
+                // set the process as dead, and a 3rd cpu runs kernelmain and
+                // destroys the memory of that process, then they keyboard handler
+                // will fault. Technically, this is impossible since the number
+                // of instructions after this function, and the number of instructions
+                // in the memory destruction of the process is greater than the keyboard
+                // handler. So the keyboard will have exited by the time that the
+                // buffer gets destroyed. But this is non-deterministic. It
+                // would be a good thing to make 100% sure that this cannot happen.
+                // CPU0                CPU1                CPU2
+                // keyb_handler        ...                 ...
+                // ...                 removeConsole       ...
+                // ...                 set dead            ...
+                // ...                 get scheduled out   ...
+                // ...                 ...                 destroyMem
+                // ERROR               ...
+                // keyb_handler_end    ...
+                //
+                // but by the time CPU1 sets process as dead and schedules it out,
+                // keyboard handler will have terminated
+
+                consoles[i] = 0;
+            }
+            else
+            {
+                memcpy64(consoles[i]->backBuffer,oldEntry->backBuffer,(2*80*25));
+                oldEntry->backBufferPointer = consoles[i]->backBufferPointer;
+                consoles[i] = oldEntry;
+            }
             mutexUnlock(&consoleListLock);
             return;
         }
@@ -417,6 +448,7 @@ uint64_t stealTextConsole(uint64_t processID)
             consoles[i] = (struct ConsoleData*)currentProcessVirt2phys((void*)entry);
             memcpy64(oldEntry->backBuffer,consoles[i]->backBuffer,(2*80*25));
             consoles[i]->backBufferPointer = oldEntry->backBufferPointer;
+            consoles[i]->previousOwningProcess = oldEntry;
             mutexUnlock(&consoleListLock);
             return (uint64_t)oldEntry;
         }
@@ -448,41 +480,15 @@ void removeConsole()
 {
     uint64_t i;
     struct ConsoleData* entry = *((struct ConsoleData**)CONSOLE_POINTER);
-    mutexLock(&consoleListLock);
     for (i=0;i<MAX_CONSOLES;i++)
     {
         if (consoles[i] == (struct ConsoleData*)currentProcessVirt2phys((void*)entry))
         {
-            // TODO: by setting this to zero, we prevent keyboard handler to 
-            // write ti keyboard buffer when the frontline process is still
-            // this process but its console was removed. But there is a window
-            // where the keyboard has checked for zero and writes into the buffer.
-            // if we set this to zero during that window, and we continue to
-            // set the process as dead, and a 3rd cpu runs kernelmain and
-            // destroys the memory of that process, then they keyboard handler 
-            // will fault. Technically, this is impossible since the number
-            // of instructions after this function, and the number of instructions
-            // in the memory destruction of the process is greater than the keyboard 
-            // handler. So the keyboard will have exited by the time that the
-            // buffer gets destroyed. But this is non-deterministic. It 
-            // would be a good thing to make 100% sure that this cannot happen.
-            // CPU0                CPU1                CPU2
-            // keyb_handler        ...                 ...
-            // ...                 removeConsole       ...
-            // ...                 set dead            ...
-            // ...                 get scheduled out   ...
-            // ...                 ...                 destroyMem
-            // ERROR               ...
-            // keyb_handler_end    ...
-            // 
-            // but by the time CPU1 sets process as dead and schedules it out,
-            // keyboard handler will have terminated
-
-            consoles[i] = 0;
-            break;
+            system_handle* h = (system_handle*)consoles[i];
+            h->destructor(h);
+            return;
         }
     }
-    mutexUnlock(&consoleListLock);
 }
 
 void switchFrontLineProcessByIndex(uint64_t index)

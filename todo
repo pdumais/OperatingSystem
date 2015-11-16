@@ -1,15 +1,43 @@
-- console resume should be done in system_handle destructor
+- TCP stack
+    - systemlib:
+        - create functions:
+            create_socket()
+            listen(s,port,ip)
+            connect(s,port,ip)
+            read(s,buf,size)
+            write(s,buf,size)
+            accept(s)
+    - kernel
+        - socket struct:
+            dest IP/port,src ip/port,ringbuffer,msgtype,qin/qout
+        - exposed system calls:
+            create_socket()
+            listen(s,port,ip)
+            connect(s,port,ip)
+            getMessage: get one message
+            write(s,buf,size)
+            acceptConnection
+        - softirq
+            - tcp stack
+                - parse incomming tcp messages into 3 types:
+                    connect,
+                    data,
+                    disconnect
+                - loops through socket list and places message in its
+                  ringbuffer if port/ip and msgtype matches
+                - locking should only be done for low level queues 
+                  that is used to send and to receive. 
+                  - processes will access sendbuffer directly
+                  - only softirq and interrupt accesses recv queue
+    - systemlib:
+        non-blocking
+        accept: will call getMessage and then call acceptConnection
+    - make telnet application
 
-- document file handles:
-    they are system handles
-        nothing in handle destructor yet    
-    linked list (not thread safe yeat)
-    on task death, we loop thru all remaining ones and call system_handle destructor
-
-
+- hexdump app: should be able to pass filename through command-line params
 ------------ To do later -------------------------------
-- serial port: can feed console like keyboard, could make a separate flush function
 - fat32 driver
+- serial port: can feed console like keyboard, could make a separate flush function
 - currently, ring3 apps can access kernel mem since kernel mem is not protected.
     lock kernel code, bios area, kernel data, IDT (read only)
     video mem, page tables
@@ -25,9 +53,6 @@
         when we arrive at the second mapping we will free it again, so other thread will lose it
     - creating more consoles than what is allowed has no error handling
 
-- Network functions
-    - provides handle
-    - netcard driver is not multithread/multicpu safe
 ===================== Cool stuff to try =====================
 - TCP/IP, and telnet shell
 - usb driver
@@ -85,4 +110,7 @@ other concept:
     free() would downsize the pool. But not all the time, because of fragmentation. So the kernel could reap
     pages that are beyond the end of the pool
 
+
+
+-----------------------------------------------------------------------------------------
 

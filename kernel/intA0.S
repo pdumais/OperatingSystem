@@ -60,6 +60,18 @@ intA0:
     je          intA0_load_process
     cmp         $INTA0_GET_DATETIME,%rax
     je          intA0_get_datetime
+    cmp         $INTA0_FOPEN,%rax
+    je          intA0_fopen
+    cmp         $INTA0_FREAD,%rax
+    je          intA0_fread
+    cmp         $INTA0_FWRITE,%rax
+    je          intA0_fwrite
+    cmp         $INTA0_FCLOSE,%rax
+    je          intA0_fclose
+    cmp         $INTA0_FSEEK,%rax
+    je          intA0_fseek
+    cmp         $INTA0_FGETSIZE,%rax
+    je          intA0_fgetsize
     jmp         intA0_exit
 
 intA0_get_apic_id:
@@ -114,6 +126,25 @@ intA0_wait_process_death:
 
 intA0_get_datetime:
     call        getDateTime
+    jmp         intA0_exit
+
+intA0_fopen:
+    call        fopen
+    jmp         intA0_exit
+intA0_fread:
+    call        fread
+    jmp         intA0_exit
+intA0_fwrite:
+    call        fwrite
+    jmp         intA0_exit
+intA0_fclose:
+    call        fclose
+    jmp         intA0_exit
+intA0_fseek:
+    call        fseek
+    jmp         intA0_exit
+intA0_fgetsize:
+    call        fgetsize
     jmp         intA0_exit
 
 

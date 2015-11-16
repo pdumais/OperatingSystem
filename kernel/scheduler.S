@@ -358,11 +358,11 @@ userProcessLaunchStubAddress:
 
 //TODO: we should do this in handle destructor. And invoke the destructor
     pop     %rbx
-    cmp     $0,%rbx
-    je      1f
-    mov     -8(%rbp),%rdi
-    mov     $INTA0_RESTORETEXTCONSOLE,%rax
-    int     $0xA0
+//    cmp     $0,%rbx
+//    je      1f
+//    mov     -8(%rbp),%rdi
+//    mov     $INTA0_RESTORETEXTCONSOLE,%rax
+//    int     $0xA0
 
 1:  mov     $INTA0_KILL_CURRENT_TASK,%rax
     int     $0xA0
