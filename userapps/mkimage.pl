@@ -6,9 +6,12 @@ my @files = grep { /elf$/ } readdir $dir;
 
 open(my $imgFile,">","apps.bin");
 
-my $imageOffset = 0;
+my $imageOffset = 0x400; # to skip bootscript which is at sector 1 and the index sector at 0.
 my %apps;
 my $index;
+
+# put the bootscript name in the index sector
+$apps{"bootscript"} = {size=>0x200, position=> 0x200};
 
 #get size and entry point of each bin
 for (@files)
@@ -56,19 +59,4 @@ print $indexFile $txt;
 print $indexFile pack("x".$pad,0);
 close($bootscriptFile);
 
-
-#open(my $indexFile,">:raw","index.bin");
-#binmode($indexFile);
-#my $pad = 0;
-#while (my $appname = <$bootscriptFile>)
-#{
-#    $appname =~ s/\R//g;
-#    print $indexFile pack("Q",$apps{$appname}{position});
-#    print $indexFile pack("Q",$apps{$appname}{size});
-#    $pad += 16;
-#}
-
-#$pad = 512-$pad;
-#print $pad;
-#print $indexFile pack("x".$pad,0);
 

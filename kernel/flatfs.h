@@ -9,4 +9,4 @@ uint64_t flatfs_fread(system_handle* h, uint64_t count, char* destination);
 uint64_t flatfs_fwrite(system_handle* h, uint64_t count, char* destination);
 void flatfs_fclose(system_handle* h);
 void flatfs_fseek(system_handle* h, uint64_t count, bool absolute);
-
+uint64_t flatfs_fgetsize(system_handle* h);

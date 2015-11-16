@@ -1,6 +1,7 @@
 #include "../types.h"
 #include "block_cache.h"
 #include "userprocess.h"
+#include "vfs.h"
 
 // This MUST be a multiple of 4096
 //TODO: we should determine the count dynamically. This will be easy when using FAT32
@@ -9,6 +10,7 @@
 extern void* kernelAllocPages(uint64_t count);
 extern void kernelReleasePages(uint64_t addr, uint64_t count);
 extern void showMem();
+extern void strcpy(char* src, char* dst);
 
 uint64_t deviceContainingScript;
 uint64_t appParam = 0;
@@ -78,45 +80,27 @@ uint8_t isValidSection(struct SectionHeader64* sh)
 uint64_t loadProcess(char* name, bool createNewConsole)
 {
     uint64_t i;
-    char index[512]; 
-    char* elfBuffer = (char*)kernelAllocPages(ELFBUFFER/4096);
-    uint64_t position = -1;
-    uint64_t size = -1;
     uint64_t n;
+    uint64_t size;
+    char* elfBuffer;
 
-    block_cache_read(0,deviceContainingScript,index,1);
-
-
-    char* lbuf = (uint64_t*)&index[0];
-    for (i = 0; i < 10; i++)       // index can't contain more than 10 entries           
+    file_handle* f = fopen(name,ACCESS_TYPE_READ);
+    if (f == 0)
     {
-        for (n=0;n<32;n++)
-        {
-            if (lbuf[n]==0x20 && name[n]==0)
-            {
-                position = *((uint64_t*)&lbuf[32]);
-                size = *((uint64_t*)&lbuf[40]);
-                break;
-            }
-            if (lbuf[n] != name[n]) break;
-
-        }
-
-        lbuf += (32+8+8);         // each index entries are 32+8+8 long
+        pf("File not found\r\n");
+        return 0;
     }
 
-    if (position == -1 || size ==-1) return 0;
-
-    position = (position>>9) + 2;
-    size = ((size+511)>>9);
-
-    if (size > (ELFBUFFER/512))
+    size = fgetsize(f);
+    if (size > ELFBUFFER)
     {
         pf("Can't load application. Too big\r\n");
-        return;
+        fclose(f);
+        return 0;
     }
+    elfBuffer = (char*)malloc(size);
 
-    block_cache_read(position,deviceContainingScript,elfBuffer,size);
+    fread(f,size,elfBuffer);
     struct ElfHeader *eh = (struct ElfHeader*)elfBuffer;
 
     struct UserProcessInfo upi;
@@ -132,7 +116,6 @@ uint64_t loadProcess(char* name, bool createNewConsole)
         __asm("mov %%cr3,%0" : "=r"(upi.consoleSteal));
     }
     createUserProcess(&upi);    
-
     char* sectionHeaders = elfBuffer[eh->sectionHeaderPosition];
     for (n = 0; n < eh->sectionHeaderEntryCount; n++)
     {
@@ -149,9 +132,8 @@ uint64_t loadProcess(char* name, bool createNewConsole)
     createProcessHeap(&upi);
     launchUserProcess(&upi);
     appParam++;
-
-    kernelReleasePages((uint64_t)elfBuffer,ELFBUFFER/4096);
-
+    fclose(f);
+    free((void*)elfBuffer);
     return upi.psi.pml4;
 }
 
@@ -161,10 +143,29 @@ void loadUserApplications(uint64_t device)
     unsigned int i,n;
     uint64_t param=0;
     char bootscript[512]; 
+    char fname[512];
+    
+    if (device >9)
+    {
+        pf("Bad device name\r\n");
+        return;
+    }
 
-    deviceContainingScript = device;
+    fname[0]='0';
+    fname[1]=0x30+device;  
+    fname[2]=':';
+    fname[3]='/';
+    strcpy("bootscript",(char*)&fname[4]);
+    file_handle* f = fopen(fname,ACCESS_TYPE_READ);
+    if (f == 0)
+    {
+        pf("ERROR: bootscript file [%s] not found\r\n",fname);
+        return;
+    }
 
     block_cache_read(1,device,bootscript,1);    // read bootscript
+    fread(f,512,bootscript);
+    fclose(f);
 
     n = 0;
     for (i = 0; i< 512; i++)
@@ -172,10 +173,11 @@ void loadUserApplications(uint64_t device)
         if (bootscript[i] == 0) break;
         if (bootscript[i] == 0x0A)
         {
-            char* name = (char*)&bootscript[n];
             bootscript[i]=0;
-            pf("loading [%s] from bootscript\r\n",name);
-            loadProcess(name,true);
+            strcpy((char*)&bootscript[n],(char*)&fname[4]);
+            fname[4+i-n]=0;
+            pf("loading [%s] from bootscript\r\n",fname);
+            loadProcess(fname,true);
             n = i+1;
         }
     }

@@ -3,6 +3,9 @@
 #include "../types.h"
 #include "systemhandle.h"
 
+#define ACCESS_TYPE_READ 1
+#define ACCESS_TYPE_WRITE 2
+
 // File path example: 01:/file.text
 
 
@@ -13,13 +16,15 @@ typedef struct
     uint64_t (*fwrite)(system_handle* h, uint64_t count, char* destination);
     void (*fclose)(system_handle* h);
     void (*fseek)(system_handle* h, uint64_t count, bool absolute);
+    uint64_t (*fgetsize)(system_handle* h);
 } file_operations;
 
 struct _file_handle
 {
     system_handle handle;
     struct _file_handle* next;
-    file_operations* operations;
+    struct _file_handle* previous;
+    file_operations operations;
 
     uint64_t start; //sector number
     uint64_t position; //relative byte offset in file
@@ -34,3 +39,4 @@ uint64_t fread(file_handle* f, uint64_t count, char* destination);
 uint64_t fwrite(file_handle* f, uint64_t count, char* destination);
 void fclose(file_handle* f);
 void fseek(file_handle* f, uint64_t count, bool absolute);
+uint64_t fgetsize(file_handle* f);

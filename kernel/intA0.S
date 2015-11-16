@@ -67,6 +67,7 @@ intA0_get_apic_id:
     jmp         intA0_exit
 
 intA0_kill_current_task:
+    call        destroyFileHandles
     call        removeConsole
     call        killCurrentTask
     jmp         intA0_exit

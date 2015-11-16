@@ -2,7 +2,6 @@
 //Stupid C compiler... must find a better way
 #define MAX_RAM_CONSTANT_FOR_C ((4LL)*(1024LL)*(1024LL)*(1024LL))
 
-
 #define TSS             0x00000500
 #define SOFTIRQLIST     0x00000600
 #define GDT             0x00000608
@@ -54,7 +53,9 @@
 #define AVX_SAVE_AREA_END (AVX_SAVE_AREA+0x7F8)
 #define TIME_SLICE_COUNT AVX_SAVE_AREA_END
 #define CONSOLE_POINTER (TIME_SLICE_COUNT+8)
-#define PROCESS_HEAP_ADDRESS (CONSOLE_POINTER+8)
+// file handles are stored as linked list at this address
+#define FILE_HANDLE_ADDRESS (CONSOLE_POINTER+8)
+#define PROCESS_HEAP_ADDRESS (FILE_HANDLE_ADDRESS+8)
 
 
 #define IDENTITY_MAPPING   0x4000000000

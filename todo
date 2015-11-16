@@ -1,7 +1,10 @@
-- must convert userboot.c code to file system usage  
+- console resume should be done in system_handle destructor
 
-- where will filehandles be stored? reserve a big block of ram
-- on process death, go though all file handles and destroy them
+- document file handles:
+    they are system handles
+        nothing in handle destructor yet    
+    linked list (not thread safe yeat)
+    on task death, we loop thru all remaining ones and call system_handle destructor
 
 
 ------------ To do later -------------------------------
@@ -15,7 +18,6 @@
 - memory pool: use it in block cache
 - IRQ sharing is inneficient: ie: rtl8139 loops trhough 32 devices and checks ISR
     should stop looping when seeing first empty device and and should check ISR faster
-- netcard driver is not multithread/multicpu safe
 - kernel pages should have global flag to avoid polluting the TLB
 - Possible bugs:
     -   If a process has two virt page that maps to the same phys and the thread dies,
@@ -24,7 +26,8 @@
     - creating more consoles than what is allowed has no error handling
 
 - Network functions
-    provides handle
+    - provides handle
+    - netcard driver is not multithread/multicpu safe
 ===================== Cool stuff to try =====================
 - TCP/IP, and telnet shell
 - usb driver

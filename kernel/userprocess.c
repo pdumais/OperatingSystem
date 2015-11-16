@@ -47,6 +47,7 @@ void createUserProcess(struct UserProcessInfo* upi)
     char* metaPage = stack0Pages+(0x1000*4);
     char* stack3Pages = (char*)allocateStackPage(4); 
     upi->metaPage = (char*)MIRRORAREA(stack0Pages+0x4000);
+    *((uint64_t*)&upi->metaPage[FILE_HANDLE_ADDRESS-META_VIRTUAL_ADDRESS]) = 0;
 
     // Create the paging structures and get the addess of the page tables
     setupProcessPageStructureForUserProcess(&upi->psi);

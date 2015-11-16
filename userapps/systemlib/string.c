@@ -21,3 +21,14 @@ size_t strfind(char* src, char token)
     if (src[i]==0) return -1;
     return i;
 }
+
+void strcpy(char* src, char* dst)
+{
+    while (*src!=0)
+    {
+        *dst = *src;
+        dst++;
+        src++;
+    }
+    *dst = 0;
+}
