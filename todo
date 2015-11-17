@@ -1,5 +1,5 @@
 - TCP stack
-    - implement connect and isconnected
+    - implement connect
         - see todos in socket.c
             //TODO: must get source interface from IP
             //TODO: calculate checksum
