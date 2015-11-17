@@ -1,5 +1,5 @@
-#include "../types.h"
-#include "systemhandle.h"
+#include "includes/kernel/types.h"
+#include "includes/kernel/systemhandle.h"
 
 //WARNING: struct should be bigger than 4k
 struct ConsoleData

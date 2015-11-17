@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../types.h"
-#include "systemhandle.h"
+#include "includes/kernel/types.h"
+#include "includes/kernel/systemhandle.h"
 
 #define ACCESS_TYPE_READ 1
 #define ACCESS_TYPE_WRITE 2

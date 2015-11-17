@@ -1,5 +1,5 @@
 #include "../memorymap.h"
-#include "../types.h"
+#include "includes/kernel/types.h"
 #include "config.h"
 #include "display.h"
 

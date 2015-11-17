@@ -1,7 +1,5 @@
 #include "console.h"
-
-#define INTA0_PRINTF 0x20
-#define INTA0_POLL_IN 0x22
+#include "kernel/intA0.h"
 
 #define MAX_PRINTF_STR 1024
 #define va_start(v,l) __builtin_va_start(v,l)

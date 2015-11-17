@@ -1,10 +1,5 @@
 #include "threads.h"
-
-#define INTA0_GET_APIC_ID 0
-#define INTA0_VIRT2PHYS   1
-#define INTA0_LOADPROCESS 2
-#define INTA0_WAITPROCESSDEATH 3
-#define INTA0_GET_DATETIME 4
+#include "kernel/intA0.h"
 
 uint64_t getCurrentCPU()
 {
@@ -36,7 +31,7 @@ uint64_t loadProcess(char* name)
 
 void waitForProcessDeath(uint64_t processID)
 {
-    __asm("int $0xA0" : : "D"(processID),"a"(INTA0_WAITPROCESSDEATH));
+    __asm("int $0xA0" : : "D"(processID),"a"(INTA0_WAITPROCESS_DEATH));
 }
 
 void getDateTime(char* str)

@@ -3,7 +3,7 @@ SOURCES=main.c
 BINDIR=../appsbin/
 OBJECTS=$(SOURCES:%.c=%.o)
 SYSTEMLIB=../systemlib
-CFLAGS=-I $(SYSTEMLIB)/ -fno-exceptions
+CFLAGS=-I $(SYSTEMLIB)/ -fno-exceptions -I../../kernel/includes
 #CFLAGS=-I $(SYSTEMLIB)/ -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -fno-exceptions
 
 all: $(TARGET).bin

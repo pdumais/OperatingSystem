@@ -1,7 +1,6 @@
 #include "memory.h"
+#include "kernel/intA0.h"
 
-#define INTA0_MALLOC 0x30
-#define INTA0_FREE 0x31
 
 void* malloc(uint64_t size)
 {

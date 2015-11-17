@@ -1,6 +1,5 @@
-#include "types.h"
-
-typedef void socket;
+#include "kernel/types.h"
+#include "kernel/sockets.h"
 
 socket* create_socket();
 void close_socket(socket* s);

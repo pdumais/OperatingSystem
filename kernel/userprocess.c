@@ -1,4 +1,4 @@
-#include "../types.h"
+#include "includes/kernel/types.h"
 #include "display.h"
 #include "../memorymap.h"
 #include "userprocess.h"

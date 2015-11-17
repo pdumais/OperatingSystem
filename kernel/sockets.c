@@ -56,7 +56,7 @@ void connect(socket *s, uint32_t ip, uint16_t port)
     //TODO: make sure port not taken already
 
     //TODO: choose source IP according to destination ip
-
+    s->tcp.connected = 0;
     s->destinationIP = ip;
     s->destinationPort = port;    
     uint8_t control = 1<<4;
@@ -65,7 +65,7 @@ void connect(socket *s, uint32_t ip, uint16_t port)
 
 uint64_t isconnected(socket* s)
 {
-    return 1;
+    return (s->tcp.connected != 0);
 }
 
 void socket_destructor(system_handle* h)

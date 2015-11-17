@@ -1,4 +1,4 @@
-#include "../types.h"
+#include "includes/kernel/types.h"
 #include "vfs.h"
 
 // This is a dumb flat FS implementation that I use while I dont

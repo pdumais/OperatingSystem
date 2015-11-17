@@ -1,7 +1,7 @@
 #include "../memorymap.h"
 #include "macros.h"
 #include "config.h"
-#include "intA0.h"
+#include "includes/kernel/intA0.h"
 
 .global initIntA0
 
