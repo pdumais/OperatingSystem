@@ -19,4 +19,3 @@ socket* create_socket();
 void close_socket(socket* s);
 void destroy_sockets(uint64_t pid);
 void connect(socket *s, uint32_t ip, uint16_t port);
-uint64_t isconnected(socket* s);

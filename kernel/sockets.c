@@ -63,11 +63,6 @@ void connect(socket *s, uint32_t ip, uint16_t port)
     send_tcp_message(s,control,0,0);
 }
 
-uint64_t isconnected(socket* s)
-{
-    return (s->tcp.connected != 0);
-}
-
 void socket_destructor(system_handle* h)
 {
     //No need to release buffers since they are part of the process and page tables will be destroyed

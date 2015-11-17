@@ -78,8 +78,6 @@ intA0:
     je          intA0_close_socket
     cmp         $INTA0_CONNECT,%rax
     je          intA0_connect
-    cmp         $INTA0_ISCONNECTED,%rax
-    je          intA0_isconnected
     jmp         intA0_exit
 
 intA0_get_apic_id:
@@ -166,9 +164,6 @@ intA0_close_socket:
     jmp         intA0_exit
 intA0_connect:
     call        connect
-    jmp         intA0_exit
-intA0_isconnected:
-    call        isconnected
     jmp         intA0_exit
 
 

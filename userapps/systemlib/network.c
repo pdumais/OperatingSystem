@@ -27,7 +27,5 @@ void connect(socket *s, char* host, uint16_t port)
 
 bool isconnected(socket* s)
 {
-    bool ret;
-    __asm("int $0xA0" : "=a"(ret) : "D"(s),"a"(INTA0_ISCONNECTED));
-    return ret;
+    return (s->tcp.connected != 0);
 }
