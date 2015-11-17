@@ -66,6 +66,7 @@ unsigned long ip_routing_route(unsigned int destinationIP, unsigned char* interf
 
     if (chosenRoute==0) return 0;
 
+    // A gateway would be set on a route only if the route is a default route.
     if (chosenRoute->gateway == 0)
     {
         // There is no gateway defined, so just flood on that interface.

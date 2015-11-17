@@ -1,18 +1,12 @@
 - TCP stack
     - implement connect
-        - see todos in socket.c
-            //TODO: must get source interface from IP
-            //TODO: calculate checksum
-            //TODO: change byte order
-            //TODO: choose  source port
-            //TODO: choose source IP according to destination ip
+        - test if the SYN gets sent out correctly
+            TCP checksum is wrong
+        - expect a ACK and send a SYN/ACK
+            - set state to connecting, then connected
     - close: should send FIN if connected
 
-    - system calls:
-        - listen(s,port,ip)
-        - getMessage: get one message
-        - write(s,buf,size)
-        - acceptConnection
+    - getMessage: get one message
         - softirq
             - tcp_process()
                 - parse incomming tcp messages into 3 types:
@@ -21,14 +15,24 @@
                     disconnect
                 - loops through socket list and places message in its
                   ringbuffer if port/ip and msgtype matches
-    - systemlib:
-        - listen(s,port,ip)
-        - read(s,buf,size) (non blocking)
-        - write(s,buf,size) (non blocking)
-        - accept(s) (non blocking)
+        - systemlib implementation
+    - listen(s,port,ip)
+        - systemlib implementation
+    - write(s,buf,size)
+        - systemlib implementation
+            - send_tcp_message will need to fragment if packet too big
+              Will need to do that without blocking
+    - acceptConnection
+        - systemlib implementation
             - will call getMessage and then call acceptConnection
 
-- make telnet application
+    - dns resolution for connect()
+    - arp_getMAC should not block.
+        - if a ARP request is sent out, the message should get pooled or it should
+          force the user to retry sending until the reply is in cache
+    - make telnet application
+
+
 - hexdump app: should be able to pass filename through command-line params
     - should get pushed on stack?
     - or just the pointer to string passed? but that new process

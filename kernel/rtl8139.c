@@ -9,7 +9,6 @@ extern unsigned int pci_getBar(unsigned int dev,unsigned char bar);
 extern unsigned short pci_getIRQ(unsigned int dev);
 extern void pci_enableBusMastering(unsigned int dev);
 extern void registerIRQ(void* handler, unsigned long irq);
-extern struct NetworkConfig* net_getConfig();
 extern void setSoftIRQ(unsigned long);
 
 
@@ -300,6 +299,10 @@ unsigned long rtl8139_send(struct NetworkBuffer *netbuf, struct NetworkCard* net
         memcpy64((char*)&netbuf->layer3Data[0],(char*)&buf[netbuf->layer2Size],netbuf->layer3Size);
         memcpy64((char*)&netbuf->layer4Data[0],(char*)&buf[netbuf->layer2Size+netbuf->layer3Size],netbuf->layer4Size);
         memcpy64((char*)&netbuf->payload[0],(char*)&buf[netbuf->layer2Size+netbuf->layer3Size+netbuf->layer4Size],netbuf->payloadSize);
+
+unsigned short i2;
+for (i2=0;i2<size;i2++) pf("%x ",buf[i2]);
+pf("\r\n");
 
         tsdValue = size;
         OUTPORTL(tsdValue,dev->iobase+tsd);

@@ -97,7 +97,7 @@ struct PacketBufferSlot* getPacketBufferSlot(unsigned int ip, unsigned short id)
         {
             //TODO: unknown slot with size slot->receivedSize
             // Handle the failure
-            asm("ud2");
+            asm("int $3");
         }
     }
     //TODO: must consider a slot free after some timeout.
@@ -110,8 +110,8 @@ struct PacketBufferSlot* getPacketBufferSlot(unsigned int ip, unsigned short id)
 // the interface on which the packet will go out
 unsigned short ip_send(unsigned long sourceInterface, unsigned int destIP, char* buffer, unsigned short payloadSize, unsigned char protocol)
 {
-    //TODO: this is not thread safe:
-    ipID++;
+    
+    ipID++; //TODO: this is not thread safe:
     unsigned char interface;
     unsigned long destMAC = ip_routing_route(destIP,&interface);
 
@@ -150,6 +150,8 @@ unsigned short ip_send(unsigned long sourceInterface, unsigned int destIP, char*
         netbuf.payloadSize = size;
         netbuf.layer3Data = (unsigned char*)&header;
         netbuf.layer3Size = sizeof(struct IPHeader);
+        netbuf.layer4Data = (unsigned char*)buffer;
+        netbuf.layer4Size = payloadSize;
 
         // Warning, we are working with big-endian here
         unsigned short r = net_send(interface, destMAC, 0x0100, 0x0008, &netbuf);

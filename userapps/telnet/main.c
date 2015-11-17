@@ -10,7 +10,8 @@ int main(uint64_t param)
 
     socket* s = create_socket();
 
-    connect(s,"google.com",6687);
+    uint32_t ip = 0x0301A8C0;    
+    connect(s,ip,6687);
 
     while (!isconnected(s));
 

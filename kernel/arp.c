@@ -66,7 +66,7 @@ void arp_process(struct Layer2Payload* payload)
 void arp_query(unsigned int ip, unsigned long interface)
 {
     // Queries will only be done for nodes on the same network.
-    SWAP4(ip);
+    //SWAP4(ip);
     unsigned char i;
 
     unsigned long ret;

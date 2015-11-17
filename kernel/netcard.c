@@ -36,6 +36,18 @@ unsigned char net_getNumberOfInterfaces()
     return n;
 }
 
+unsigned char net_getInterfaceIndex(unsigned int ip)
+{
+    unsigned char i;
+    unsigned int ipBE = ip;
+    SWAP4(ipBE);
+    for (i=0;i<32;i++)
+    {
+        if (networkCards[i].ownNetworkConfig.ip == ipBE) return i;
+    }
+    return 255;
+}
+
 void net_init()
 {
     char* recvBuffer;

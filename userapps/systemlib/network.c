@@ -17,15 +17,27 @@ void close_socket(socket* s)
     __asm("int $0xA0" : : "D"(s),  "a"(INTA0_CLOSE_SOCKET));
 }
 
-void connect(socket *s, char* host, uint16_t port)
+void connect(socket *s, uint32_t destination, uint16_t port)
 {
-    //TODO: net to resolve host or convert IP to uint32_t
-
-    uint32_t ip = 0x0301A8C0;    
-    __asm("int $0xA0" : : "D"(s),"S"(ip),"d"(port), "a"(INTA0_CONNECT));
+    __asm("int $0xA0" : : "D"(s),"S"(destination),"d"(port), "a"(INTA0_CONNECT));
 }
 
 bool isconnected(socket* s)
 {
     return (s->tcp.connected != 0);
+}
+
+uint32_t atoip(char* addr)
+{
+    // TODO
+}
+
+void iptoa(uint32_t addr, char* buf)
+{
+    // TODO
+}
+
+void resolveDNS(char* host)
+{
+    // TODO
 }

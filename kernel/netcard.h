@@ -49,3 +49,6 @@ struct NetworkCard
     void (*recvProcessed)(struct NetworkCard*);
     unsigned long (*send)(struct NetworkBuffer *, struct NetworkCard*);
 };
+
+unsigned char net_getInterfaceIndex(unsigned int ip);
+struct NetworkConfig* net_getConfig(unsigned char index);

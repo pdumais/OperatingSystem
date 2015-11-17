@@ -5,6 +5,7 @@
 .global yield
 .global getCurrentThreadID
 .global strcpy
+.global atomic_increase_within_range
 
 #include "../memorymap.h"
 #include "macros.h"
@@ -113,3 +114,21 @@ strcpy:
     pop         %rsi
     ret
     
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+// atomic_increase_within_range(rdi=var_addr,rsi=start,rdx=end)
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+atomic_increase_within_range:
+    push        %rbx
+1:  mov         (%rdi),%rax
+    mov         %rax,%rbx
+    inc         %rbx
+    cmp         %rdx,%rbx
+    jb          2f
+    mov         %rsi,%rbx
+2:  lock cmpxchgq %rbx,(%rdi)
+    jnz         1b
+    mov         %rbx,%rax
+    pop         %rbx
+    ret 
