@@ -1,7 +1,6 @@
-
-
 - TCP stack
     - implement connect and isconnected
+        - see todos in socket.c
     - close: should send FIN if connected
 
     DESIGN:
@@ -21,10 +20,6 @@
                     disconnect
                 - loops through socket list and places message in its
                   ringbuffer if port/ip and msgtype matches
-                - locking should only be done for low level queues 
-                  that is used to send and to receive. 
-                  - processes will access sendbuffer directly
-                  - only softirq and interrupt accesses recv queue
     - systemlib:
         - create functions:
             listen(s,port,ip)
@@ -43,13 +38,13 @@
 
 ------------ To do later -------------------------------
 - fat32 driver
-- serial port: can feed console like keyboard, could make a separate flush function
 - currently, ring3 apps can access kernel mem since kernel mem is not protected.
     lock kernel code, bios area, kernel data, IDT (read only)
     video mem, page tables
 - block cache: the block cache is not multi-cpu friendly (see doc/blockcache)
     would need a test suite to handle all normal cases and concurrency cases
 - memory pool: use it in block cache
+- serial port: can feed console like keyboard, could make a separate flush function
 - IRQ sharing is inneficient: ie: rtl8139 loops trhough 32 devices and checks ISR
     should stop looping when seeing first empty device and and should check ISR faster
 - kernel pages should have global flag to avoid polluting the TLB
@@ -58,7 +53,7 @@
         we will free all pages. But if we free the first mapping, then another CPU maps it
         when we arrive at the second mapping we will free it again, so other thread will lose it
     - creating more consoles than what is allowed has no error handling
-
+- see memorymanagement in doc folder
 ===================== Cool stuff to try =====================
 - TCP/IP, and telnet shell
 - usb driver
@@ -66,57 +61,26 @@
     bootloader in MBR and kernerl in partition 1   
 - virtualization (nested virtualization??)
 
-
-
 ======================================================================================
-                    MEMORY MANAGEMENT
-right now malloc reserves virt mem and phys is mapped on #pf only. there
-is no free block reaping after free. pages freed after process death
-need better system:
 
-- should reclaim unused pages such as:
-    a low-priority task than scavenges unused pages.
-    The task would go through all processes and invoke:
-        - scanvengeStack()
-        - scavengeHeap(size,F)
-            F is a function void F(start,end).
-            It will loop through the heap and find all
-            areas larger than "size" and invoke F(area_start,area_end)
-            The F function will then be able to free pages.
-    But while scavenging, the stack should not move, nor the heap!!            
------
-on free: 
-    tell the kernel that what range was freed and let him dealloc pages
-    OR
-    tell him what is the highest address reserved
-        - it will free pages between old highest and new highest
-        - wont work well with fragmentation
+receiving a message:
+the netcard abstraction's net_process() function, invoked
+by the softirq, agglomerates messages from all netcards and
+distributes them to the ICMP or IP handlers.
 
-on malloc:
-    tell kernel what range was allocated
-        - since pages not present, we can use other bits to indicate that this page is reserved
-        - on #PF, if page not reserved, then dont allocate it.
-    
+The ICMP handler responds immediately to ping requests. The IP
+handler forwards the message to the TCP or UDP handlers. The
+UDP handler is not implemented yet. The TCP handler forwards
+the message to active sockets by finding the socket listening
+to the port and ip of the message. The message is added in 
+the socket's message queue while locking the list
 
-stack: *** Search for "stack page deallocation"
-    will need to scavenge.
-    when?
-        thread resume?
-        thread going to sleep?
+sending a message
+the netcard abstraction's net_send() function locks
+the netcard implementation's send spinlock.
 
-
-other concept:
-    process gets a pool of heap. It starts with, let's say, 16mb in the pool. The pages are not allocated but they are reserved
-    These are the virtual pages of the process. Since they are not present, we can use the rest of the bits to indicate that
-    they are reserved. malloc() would be implemented in userland (systemlib). It would manage the linked list.
-    It wouldn't allocate the page to phys. #PF will do that. But #PF can know if the page is reserved or not.
-    If it wasn't, then it wasn't part of the pool. If the pool needs to grow, then malloc requests that to the kernel
-    The kernel will then mark more more of these pages. 
-
-    free() would downsize the pool. But not all the time, because of fragmentation. So the kernel could reap
-    pages that are beyond the end of the pool
-
-
-
------------------------------------------------------------------------------------------
+net_send() takes an interface index as destination parameter.
+ip_send takes an ip address as destination parameter. ip_send
+invokes ip_routing_route() to determine on what netcard
+to send the message based the destination address.
 

@@ -1,6 +1,8 @@
 #include "../memorymap.h"
 .global mutexLock
 .global mutexUnlock
+.global spinLock
+.global spinUnlock
 .global disableCurrentThread
 .global enableThread
 .global rwlockWriteLock
@@ -30,6 +32,26 @@ mutexLock:
 mutexUnlock:       // rdi = mutext address
     lock incq   4(%rdi) 
     ret
+
+
+// spinlock with ticketing system.
+// rdi= address to mutex
+// spinlock is a 64bit value representing:
+// 63:32: next ticket
+// 31:0 : current ticket
+spinLock:
+    push        %rax
+    mov         $1,%rax
+    lock xadd   %eax,(%rdi)
+1:  cmp         %eax,4(%rdi)
+    jne         1f
+    pop         %rax
+    ret
+
+spinUnlock:       // rdi = spinlock address
+    lock incq   4(%rdi)
+    ret
+
 
 
 

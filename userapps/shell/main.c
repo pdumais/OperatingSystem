@@ -80,9 +80,12 @@ int main(uint64_t param)
         else if (ch==0x0A)
         {
             printf("\r\n");
-            command[cmdIndex]=0;
-            processCommand();
-            cmdIndex = 0;
+            if (cmdIndex != 0)
+            {
+                command[cmdIndex]=0;
+                processCommand();
+                cmdIndex = 0;
+            }
             printf("shell> \003");
         }
     }

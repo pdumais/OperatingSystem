@@ -12,6 +12,27 @@
 
 //TODO: a linked list for the sockets can be slow to search.
 
+typedef struct 
+{
+    uint32_t ackNumber;
+    uint32_t seqNumber;
+} tcp_state;
+
+typedef struct
+{
+    uint16_t source;
+    uint16_t destination;
+    uint32_t sequence;
+    uint32_t acknowledgement;
+        unsigned char offset:4;
+        unsigned char reserved:3;
+        unsigned char ecn:3;
+        unsigned char control:6;
+    uint16_t window;
+    uint16_t checksum;
+    uint16_t urgent;
+} tcp_header;
+
 struct _socket_message
 {
     char payload[MTU];
@@ -24,6 +45,7 @@ typedef struct _socket_message socket_message;
 struct _socket
 {
     system_handle handle;
+    tcp_state tcp;
     struct _socket* next;                       
     struct _socket* previous;                       
     

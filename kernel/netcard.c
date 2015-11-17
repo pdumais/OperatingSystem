@@ -14,8 +14,8 @@ extern unsigned long rtl8139_getMACAddress();
 extern unsigned long rtl8139_receive(unsigned char** buffer,struct NetworkCard*);
 extern void rtl8139_recvProcessed(struct NetworkCard*);
 extern unsigned long rtl8139_send(struct NetworkBuffer *,struct NetworkCard*);
-extern void mutexLock(unsigned long*);
-extern void mutexUnlock(unsigned long*);
+extern void spinLock(unsigned long*);
+extern void spinUnlock(unsigned long*);
 extern void arp_process(struct Layer2Payload* payload);
 extern void arp_learn(struct Layer2Payload* payload);
 extern void yield();
@@ -106,6 +106,9 @@ void net_setIPConfig(unsigned int ip, unsigned int subnetmask, unsigned short vl
 
 }
 
+// There is no need to lock in this function because
+// only the softirq will call this. Locking with the 
+// interrupt handler will is implemented in the netcard
 void net_process()
 {
     unsigned char cardIndex;
@@ -128,7 +131,7 @@ void net_process()
                 // WARNING: everything in net buffer is big-endiand
                 payload.size = size - 4; // remove CRC at the end
                 payload.to = *((unsigned long*)&buf[0])&0x0000FFFFFFFFFFFF;
-                    payload.from = *((unsigned long*)&buf[4])>>16;
+                payload.from = *((unsigned long*)&buf[4])>>16;
                 payload.protocol = *((unsigned short*)&buf[12]);
                 if (payload.protocol == 0x0081) // vlan tag
                 {
@@ -188,9 +191,9 @@ unsigned long net_send(unsigned char interface, unsigned long destinationMAC, un
     ret = 0;
     while (retry>0 && ret==0)
     {
-        mutexLock(&netcard->send_mutex);
+        spinLock(&netcard->send_mutex);
         ret = netcard->send(netbuf,netcard);
-        mutexUnlock(&netcard->send_mutex);
+        spinUnlock(&netcard->send_mutex);
         if (ret==0)
         {
             yield();

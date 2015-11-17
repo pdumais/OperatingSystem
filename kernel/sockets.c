@@ -1,11 +1,32 @@
 #include "sockets.h"
 #include "../memorymap.h"
+#include "ip.h"
+
+#define EPHEMERAL_START 32778
+#define EPHEMERAL_END 65535
 
 void socket_destructor(system_handle* h);
 void add_socket_in_list(socket* s);
 void remove_socket_from_list(socket* s);
 
 
+void send_tcp_message(socket* s, uint8_t control, char* payload, uint16_t size)
+{
+    tcp_header h;
+
+    //TODO: must get source interface from IP
+    uint64_t sourceInterface;
+
+    h.source = s->sourcePort;  
+    h.destination = s->destinationPort;
+    h.sequence = s->tcp.seqNumber;
+    h.acknowledgement = s->tcp.ackNumber;
+    h.control = control;
+    //TODO: calculate checksum
+
+//TODO:change byte order
+//    ip_send(sourceInterface, s->destinationIP, &h, sizeof(tcp_header), 6);
+}
 
 socket* create_socket()
 {
@@ -31,6 +52,15 @@ void close_socket(socket* s)
 
 void connect(socket *s, uint32_t ip, uint16_t port)
 {
+    //TODO: choose  source port
+    //TODO: make sure port not taken already
+
+    //TODO: choose source IP according to destination ip
+
+    s->destinationIP = ip;
+    s->destinationPort = port;    
+    uint8_t control = 1<<4;
+    send_tcp_message(s,control,0,0);
 }
 
 uint64_t isconnected(socket* s)
