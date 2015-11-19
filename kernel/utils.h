@@ -1,3 +1,4 @@
+#pragma once
 
 #ifndef UNIT_TEST
 
@@ -29,3 +30,9 @@
 #define SWAP6(x) asm volatile( "nop" :: );
 
 #endif
+
+typedef struct
+{
+    unsigned long part1;
+    unsigned long part2;
+} spinlock_softirq_lock;

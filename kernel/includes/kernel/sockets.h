@@ -9,14 +9,17 @@
 #define SOCKET_MESSAGE_FIN 3
 #define SOCKET_MESSAGE_PAYLOAD 4
 
-
+#define SOCKET_STATE_CLOSED 0
+#define SOCKET_STATE_WAITSYNACK 1
+#define SOCKET_STATE_CONNECTED 2
+#define SOCKET_STATE_RESET 3
 
 //TODO: a linked list for the sockets can be slow to search.
 typedef struct 
 {
     uint32_t ackNumber;
     uint32_t seqNumber;
-    uint8_t connected;
+    uint8_t state;
 } tcp_state;
 
 struct _socket_message

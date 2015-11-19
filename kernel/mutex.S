@@ -3,6 +3,8 @@
 .global mutexUnlock
 .global spinLock
 .global spinUnlock
+.global spinLock_softirq
+.global spinUnlock_softirq
 .global disableCurrentThread
 .global enableThread
 .global rwlockWriteLock
@@ -52,6 +54,37 @@ spinUnlock:       // rdi = spinlock address
     lock incq   4(%rdi)
     ret
 
+
+// spinlock with ticketing system.                                                    
+// rdi= address to mutex                                                              
+// spinlock is a 128bit value representing:                                            
+// 127:64: flags status 
+// 63:32 : next ticket                                                                 
+// 31:0  : current ticket                                                              
+// WARNING: This will disable interrupts. So this should not be used between
+//          threads since they wont be preempted and won't give a chance
+//          to concurrents to release the lock. but then again, it the
+//          interrupts are cleared, then this thread will be guaranteed to
+//          be able to release the lock without being preempted
+spinLock_softirq:                                                                             
+    push        %rax   
+    pushf
+    pop         %rax
+    mov         %rax,8(%rdi)
+    cli                                                               
+    mov         $1,%rax                                                               
+    lock xadd   %eax,(%rdi)                                                           
+1:  cmp         %eax,4(%rdi)                                                          
+    jne         1f                                                                    
+    pop         %rax                                                                  
+    ret                                                                               
+                                                                                      
+spinUnlock_softirq:       // rdi = spinlock address                                           
+    lock incq   4(%rdi)                                                               
+    bt          $9,8(%rdi)
+    jnc         1f
+    sti
+1:  ret                                      
 
 
 

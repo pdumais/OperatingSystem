@@ -6,6 +6,7 @@
 .global getCurrentThreadID
 .global strcpy
 .global atomic_increase_within_range
+.global tcp_checksum
 
 #include "../memorymap.h"
 #include "macros.h"
@@ -92,6 +93,57 @@ checksum_1complement:
 sumdone:
     not     %rax
     xchg    %ah,%al
+    pop     %rcx
+    pop     %rbx
+    ret
+
+
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+// tcp_checksum(rdi= buffer, rsi=bufsize, rdx=src, rcx=dst)
+// The buffer must contain the tcp header and tcp data
+// dst and src must be in bigendian
+// return: rax will contain the big-endian checksum
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+tcp_checksum:
+    push    %rbx
+    push    %rcx
+    push    %r8
+    push    %r9
+
+    mov     %rcx,%r9
+    mov     %rsi,%r8
+
+    mov     %rsi,%rcx
+    shr     $1,%rcx     // we work on 16bit words, so divide byte count by two.
+    mov     $0,%rax
+    mov     $0,%rbx
+1:  movw    (%rdi),%bx
+    xchg    %bl,%bh
+    add     %rbx,%rax
+    add     $2,%rdi
+    loop    1b
+
+    // now add the pseudo header
+    add     %rdx,%rax
+    add     %r9,%rax
+//    bswap   %r8
+  //  shr     $48,%r8
+    add     %r8,%rax
+    add     $0x06,%rax
+
+2:  mov     %rax,%rbx
+    shr     $16,%rbx
+    jz      3f
+    and     $0xFFFF,%rax
+    add     %rbx,%rax
+    jmp     2b
+3:  not     %rax
+    xchg    %ah,%al
+
+    pop     %r9
+    pop     %r8
     pop     %rcx
     pop     %rbx
     ret

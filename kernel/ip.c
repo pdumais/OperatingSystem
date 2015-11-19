@@ -1,6 +1,7 @@
 #include "display.h"
 #include "utils.h"
 #include "netcard.h"
+#include "sockets.h"
 
 #define MAX_IP_PAYLOAD_SIZE 1480
 
@@ -219,6 +220,7 @@ void ip_process(struct Layer2Payload* payload)
             break;
             case 6: // TCP
             {
+                tcp_process((char*)&slot->payload[0],slot->receivedSize, header->source, header->destination);
             }
             break;
             case 17: // UDP

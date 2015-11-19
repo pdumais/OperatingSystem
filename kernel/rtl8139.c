@@ -300,10 +300,6 @@ unsigned long rtl8139_send(struct NetworkBuffer *netbuf, struct NetworkCard* net
         memcpy64((char*)&netbuf->layer4Data[0],(char*)&buf[netbuf->layer2Size+netbuf->layer3Size],netbuf->layer4Size);
         memcpy64((char*)&netbuf->payload[0],(char*)&buf[netbuf->layer2Size+netbuf->layer3Size+netbuf->layer4Size],netbuf->payloadSize);
 
-unsigned short i2;
-for (i2=0;i2<size;i2++) pf("%x ",buf[i2]);
-pf("\r\n");
-
         tsdValue = size;
         OUTPORTL(tsdValue,dev->iobase+tsd);
         dev->currentTXDescriptor = (dev->currentTXDescriptor+1)&0b11; // wrap around 4

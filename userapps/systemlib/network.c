@@ -22,9 +22,11 @@ void connect(socket *s, uint32_t destination, uint16_t port)
     __asm("int $0xA0" : : "D"(s),"S"(destination),"d"(port), "a"(INTA0_CONNECT));
 }
 
-bool isconnected(socket* s)
+char isconnected(socket* s)
 {
-    return (s->tcp.connected != 0);
+    if (s->tcp.state == SOCKET_STATE_RESET) return -1;
+    if (s->tcp.state == SOCKET_STATE_CONNECTED) return 1;
+    return 0;
 }
 
 uint32_t atoip(char* addr)

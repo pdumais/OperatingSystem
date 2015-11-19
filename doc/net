@@ -1,0 +1,20 @@
+http://www.tldp.org/HOWTO/KernelAnalysis-HOWTO-8.html
+http://www.cubrid.org/blog/dev-platform/understanding-tcp-ip-network-stack/
+http://1.bp.blogspot.com/_Y6kJq_O7xJw/So8Vg9IQJXI/AAAAAAAAADo/G5Jk-Cjadto/s1600-h/TCP_Ingress_Queuing.png
+
+tcp_v4_do_rcv
+    tcp_ack_snd_check 
+
+so the ack is sent from the softIRQ? 
+    - but my send function has a lock. We cannot, or should not, lock in the softIRQ.
+      because if another thread has that lock we would deadlock.
+    - and what if the driver cant send anymore because Q is full? the softIRQ would spin retrying.
+    
+    - unless we clear interrupts and then spinlock
+        1 - spinlock will prevent another CPU from accessing the send function
+        2 - the thread could not be preempted on the local CPU so there is no chances
+            that a softIRQ would deadlock (since softIIRQ are prioritized over that 
+            thread, it could continue to run and never give time to the thread to 
+            release the lock). 
+        3 - On a single-CPU system, the interrupt cleared and spinlock would be
+            redundant but would not cause a problem

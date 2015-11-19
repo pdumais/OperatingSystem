@@ -1,3 +1,4 @@
+#include "utils.h"
 #define MAC_DESTINATION_MULTICAST   0x8000
 #define MAC_DESTINATION_UNICAST     0x4000
 #define MAC_DESTINATION_BROADCAST   0x2000
@@ -38,7 +39,7 @@ struct NetworkBuffer
 
 struct NetworkCard
 {
-    unsigned long send_mutex;
+    spinlock_softirq_lock send_mutex;
     struct NetworkConfig ownNetworkConfig;
     void* deviceInfo;
 

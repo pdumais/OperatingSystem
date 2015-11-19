@@ -1,36 +1,33 @@
 - TCP stack
-    - implement connect
-        - test if the SYN gets sent out correctly
-            TCP checksum is wrong
-        - expect a ACK and send a SYN/ACK
-            - set state to connecting, then connected
     - close: should send FIN if connected
+    - receiving fin: 4way close. close the socket
 
     - getMessage: get one message
-        - softirq
-            - tcp_process()
-                - parse incomming tcp messages into 3 types:
-                    connect,
-                    data,
-                    disconnect
-                - loops through socket list and places message in its
-                  ringbuffer if port/ip and msgtype matches
-        - systemlib implementation
-    - listen(s,port,ip)
+        - tcp_process()
+            - loops through socket list and places message in its
+              ringbuffer if port/ip and msgtype matches
+            - update ack number
+        - will need to reconstruct message up to message length.
         - systemlib implementation
     - write(s,buf,size)
+        - send_tcp_message will need to fragment if packet too big
+          Will need to do that without blocking
         - systemlib implementation
-            - send_tcp_message will need to fragment if packet too big
-              Will need to do that without blocking
-    - acceptConnection
-        - systemlib implementation
-            - will call getMessage and then call acceptConnection
-
-    - dns resolution for connect()
-    - arp_getMAC should not block.
-        - if a ARP request is sent out, the message should get pooled or it should
-          force the user to retry sending until the reply is in cache
+    - listen(s,port,ip) and acceptConnection()
     - make telnet application
+    - arp_getMAC should not block.
+        Upon connecting a socket, ARP discovery and DNS resolution
+        might need to be performed. DNS resolution will be left to 
+        the user to do. connect() will require an IP address. Upon
+        connect, the socket will be placed in "arp discovery" state.
+        The MAC address will be fetched from the cache or a discovery
+        will be sent. Upon receiving an ARP reply, or any other ARP
+        cache entry addition, the stack will search through the
+        socket list for sockets that are waiting for that entry.
+        The connection will then be resumed. Once the an ARP entry
+        is found for a socket, it will be saved in the socket and
+        reused for all remaining transmission.
+    - dns resolution for connect()
 
 
 - hexdump app: should be able to pass filename through command-line params
@@ -64,6 +61,7 @@
 - virtualization (nested virtualization??)
 
 ======================================================================================
+Current network implementation:
 
 receiving a message:
 the netcard abstraction's net_process() function, invoked
@@ -85,4 +83,11 @@ net_send() takes an interface index as destination parameter.
 ip_send takes an ip address as destination parameter. ip_send
 invokes ip_routing_route() to determine on what netcard
 to send the message based the destination address.
+
+
+
+
+
+
+
 

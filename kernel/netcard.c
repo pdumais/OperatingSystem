@@ -14,8 +14,8 @@ extern unsigned long rtl8139_getMACAddress();
 extern unsigned long rtl8139_receive(unsigned char** buffer,struct NetworkCard*);
 extern void rtl8139_recvProcessed(struct NetworkCard*);
 extern unsigned long rtl8139_send(struct NetworkBuffer *,struct NetworkCard*);
-extern void spinLock(unsigned long*);
-extern void spinUnlock(unsigned long*);
+extern void spinLock_softirq(spinlock_softirq_lock*);
+extern void spinUnlock_softirq(spinlock_softirq_lock*);
 extern void arp_process(struct Layer2Payload* payload);
 extern void arp_learn(struct Layer2Payload* payload);
 extern void yield();
@@ -156,7 +156,8 @@ void net_process()
                 {
                     payload.vlan = 1;
                     payload.data = (unsigned char*)&buf[14];
-                    }
+                }
+
                 if (payload.protocol==(0x0608))
                 {
                    arp_process(&payload);
@@ -203,14 +204,20 @@ unsigned long net_send(unsigned char interface, unsigned long destinationMAC, un
     ret = 0;
     while (retry>0 && ret==0)
     {
-        spinLock(&netcard->send_mutex);
+        // Here, we use a spinlock_softirq. This will clear interrupts and acquire a spinlock.
+        // The dangers are that this function can be called from the softirq. On mono-processsor
+        // systems, a thread could acquire the lock and then be preempted in favor of the softirq.
+        // Since the softirq has higher priority, on each schedule(), it would be scheduled back,
+        // never leaving time for the thread to release the spinlock. So by clearing interrupts,
+        // we can be guaranteed that this task will not be interrupted by a softirq and thus
+        // creating a deadlock. On multi-cpu, the worst that would have happened is that this
+        // CPU would continue to wait in the softirq context until the locking thread gets
+        // scheduled on another CPU. So this allows us to send data over the network safely
+        // from the softIRQ context.
+        spinLock_softirq(&netcard->send_mutex);
         ret = netcard->send(netbuf,netcard);
-        spinUnlock(&netcard->send_mutex);
-        if (ret==0)
-        {
-            yield();
-            retry--;
-        }
+        spinUnlock_softirq(&netcard->send_mutex);
+        if (ret==0) retry--;
     }
     return ret;
 }
