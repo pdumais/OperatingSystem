@@ -1,15 +1,5 @@
 - TCP stack
-    - close: should send FIN if connected
-    - receiving fin: 4way close. close the socket
-
-    - getMessage: get one message
-        - tcp_process()
-            - loops through socket list and places message in its
-              ringbuffer if port/ip and msgtype matches
-            - update ack number
-        - will need to reconstruct message up to message length.
-        - systemlib implementation
-    - write(s,buf,size)
+    - send(s,buf,size)
         - send_tcp_message will need to fragment if packet too big
           Will need to do that without blocking
         - systemlib implementation
@@ -28,7 +18,6 @@
         is found for a socket, it will be saved in the socket and
         reused for all remaining transmission.
     - dns resolution for connect()
-
 
 - hexdump app: should be able to pass filename through command-line params
     - should get pushed on stack?
@@ -61,33 +50,21 @@
 - virtualization (nested virtualization??)
 
 ======================================================================================
-Current network implementation:
 
-receiving a message:
-the netcard abstraction's net_process() function, invoked
-by the softirq, agglomerates messages from all netcards and
-distributes them to the ICMP or IP handlers.
+socket locking:
+Problem to solve:   1) make sure a thread does not delete its socket while softIRQ is 
+                       using it.
+                    2) a thread might want to get the seqnumber while the softirq is
+                       playing with it
 
-The ICMP handler responds immediately to ping requests. The IP
-handler forwards the message to the TCP or UDP handlers. The
-UDP handler is not implemented yet. The TCP handler forwards
-the message to active sockets by finding the socket listening
-to the port and ip of the message. The message is added in 
-the socket's message queue while locking the list
+solution:           softirq should lock socket. thread should try to lock socket 
+                    before trying to delete it. then it will delete it and remove
+                    it from list. This is a guarantee that no deleted socket will
+                    be stored in the list. 
+                    ANOTHER PROBLEM: if the softIRQ is waiting on socket release
+                                     and the thread releases it?
 
-sending a message
-the netcard abstraction's net_send() function locks
-the netcard implementation's send spinlock.
-
-net_send() takes an interface index as destination parameter.
-ip_send takes an ip address as destination parameter. ip_send
-invokes ip_routing_route() to determine on what netcard
-to send the message based the destination address.
-
-
-
-
-
-
-
-
+socket list locking:
+problem to solve:   make that only one consumer at a time can append/remove from the 
+                    list.
+---------------------------------

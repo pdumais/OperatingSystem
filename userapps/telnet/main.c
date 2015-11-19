@@ -11,7 +11,7 @@ int main(uint64_t param)
     socket* s = create_socket();
 
     uint32_t ip = 0x0301A8C0;    
-    connect(s,ip,80);
+    connect(s,ip,25);
 
     char r=0;
     while (!r) r = isconnected(s);
@@ -24,7 +24,21 @@ int main(uint64_t param)
         printf("Connection established\r\n");
     }
 
-    close_socket(s);
+    i = 0x40000000;
+    char* buf = (char*)malloc(0x10000);
+    while (i) i--;
 
+    uint16_t received = recv(s,buf,0x10000-1);
+    if (received > 0)
+    {  
+        buf[received] = 0;
+        printf("Got %x bytes: %s\r\n",received,buf);
+    }
+
+    close_socket(s);
+    r=0;
+    while (!r) r = isclosed(s);
+
+    release_socket(s);
 
 }

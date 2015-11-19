@@ -27,3 +27,7 @@ clean:
 
 disasm:
 	objdump -D -b binary -mi386 -M x86-64 kernel/kernel.o 
+
+tunctl:
+	tunctl -u pat -t tap2 
+	tunctl -u pat -t tap4 

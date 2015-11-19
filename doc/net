@@ -18,3 +18,36 @@ so the ack is sent from the softIRQ?
             release the lock). 
         3 - On a single-CPU system, the interrupt cleared and spinlock would be
             redundant but would not cause a problem
+
+
+Current network implementation:
+
+receiving a message:
+the netcard abstraction's net_process() function, invoked
+by the softirq, agglomerates messages from all netcards and
+distributes them to the ICMP or IP handlers.
+
+The ICMP handler responds immediately to ping requests. The IP
+handler forwards the message to the TCP or UDP handlers. The
+UDP handler is not implemented yet. The TCP handler forwards
+the message to active sockets by finding the socket listening
+to the port and ip of the message. The message is added in 
+the socket's message queue while locking the list
+
+sending a message
+the netcard abstraction's net_send() function locks
+the netcard implementation's send spinlock.
+
+net_send() takes an interface index as destination parameter.
+ip_send takes an ip address as destination parameter. ip_send
+invokes ip_routing_route() to determine on what netcard
+to send the message based the destination address.
+
+tcp has no notion of size. A segment is a segment. It is the 
+layer7 that is responsible of reconstructing full messages
+
+
+
+
+
+

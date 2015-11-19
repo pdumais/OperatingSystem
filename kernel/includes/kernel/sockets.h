@@ -9,25 +9,24 @@
 #define SOCKET_MESSAGE_FIN 3
 #define SOCKET_MESSAGE_PAYLOAD 4
 
-#define SOCKET_STATE_CLOSED 0
+#define SOCKET_STATE_NEW 0
 #define SOCKET_STATE_WAITSYNACK 1
 #define SOCKET_STATE_CONNECTED 2
-#define SOCKET_STATE_RESET 3
+#define SOCKET_STATE_CLOSING 4
+#define SOCKET_STATE_CLOSED 0x80
+#define SOCKET_STATE_RESET 0x81
+
 
 //TODO: a linked list for the sockets can be slow to search.
 typedef struct 
 {
-    uint32_t ackNumber;
+    // nextExpectedSeq will be used in the ack number field.
+    // it represents the the next expected sequence number we expext
+    // to receive and acknowledges the previous packet received
+    uint32_t nextExpectedSeq;   
     uint32_t seqNumber;
     uint8_t state;
 } tcp_state;
-
-struct _socket_message
-{
-    char payload[MTU];
-    uint16_t size;
-    uint16_t type;
-};
 
 typedef struct _socket_message socket_message;
 
@@ -47,7 +46,7 @@ struct _socket
     uint16_t messageTypeWanted;
     uint64_t queueLock;
     uint64_t owner;
-    socket_message* messages;
+    char* messages;
 };
 
 typedef struct _socket socket;

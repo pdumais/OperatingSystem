@@ -76,8 +76,12 @@ intA0:
     je          intA0_create_socket
     cmp         $INTA0_CLOSE_SOCKET,%rax
     je          intA0_close_socket
+    cmp         $INTA0_RELEASE_SOCKET,%rax
+    je          intA0_release_socket
     cmp         $INTA0_CONNECT,%rax
     je          intA0_connect
+    cmp         $INTA0_RECV,%rax
+    je          intA0_recv
     jmp         intA0_exit
 
 intA0_get_apic_id:
@@ -162,8 +166,14 @@ intA0_create_socket:
 intA0_close_socket:
     call        close_socket
     jmp         intA0_exit
+intA0_release_socket:
+    call        release_socket
+    jmp         intA0_exit
 intA0_connect:
     call        connect
+    jmp         intA0_exit
+intA0_recv:
+    call        recv
     jmp         intA0_exit
 
 
