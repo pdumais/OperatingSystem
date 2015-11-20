@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "netcard.h"
 #include "sockets.h"
+#include "ip.h"
 
 #define MAX_IP_PAYLOAD_SIZE 1480
 
@@ -109,16 +110,17 @@ struct PacketBufferSlot* getPacketBufferSlot(unsigned int ip, unsigned short id)
 
 // sourceInterface is the interface that we will take the IP from and put it in the "from" of the IP packet. It is not
 // the interface on which the packet will go out
-unsigned short ip_send(unsigned long sourceInterface, unsigned int destIP, char* buffer, unsigned short payloadSize, unsigned char protocol)
+// ip_send can send packets up to 64k in size. it will fragment message if too big for 1 MTU
+int ip_send(unsigned long sourceInterface, unsigned int destIP, char* buffer, unsigned short payloadSize, unsigned char protocol)
 {
+    uint64_t i;
     
     ipID++; //TODO: this is not thread safe:
     unsigned char interface;
     unsigned long destMAC = ip_routing_route(destIP,&interface);
 
-    if (destMAC==0) return 0;
+    if (destMAC==0) return IP_SEND_ERROR_NO_MAC;
     SWAP6(destMAC);
-
 
     struct NetworkConfig* conf = net_getConfig(sourceInterface);
     struct IPHeader header={0};
@@ -131,13 +133,16 @@ unsigned short ip_send(unsigned long sourceInterface, unsigned int destIP, char*
     header.source = conf->ip;
     header.destination = destIP;
 
+    // we will fragment the packet in several pieces of max MTU size
+    unsigned short sizeLeft = payloadSize;
     unsigned short ret = 0;
     unsigned short offset = 0;
-    while (payloadSize > 0)
+    
+    while (sizeLeft > 0)
     {   
-        unsigned short size = (payloadSize>MAX_IP_PAYLOAD_SIZE)?MAX_IP_PAYLOAD_SIZE:payloadSize;
-        payloadSize-= size;
-        header.flagsOffset = (payloadSize>0)?0b001:0b000;
+        unsigned short size = (sizeLeft>MAX_IP_PAYLOAD_SIZE)?MAX_IP_PAYLOAD_SIZE:sizeLeft;
+        sizeLeft-= size;
+        header.flagsOffset = (sizeLeft>0)?0b001:0b000; // fragment?
         header.flagsOffset = header.flagsOffset<<13;
         header.flagsOffset |= (offset>>3);
         SWAP2(header.flagsOffset);
@@ -151,16 +156,14 @@ unsigned short ip_send(unsigned long sourceInterface, unsigned int destIP, char*
         netbuf.payloadSize = size;
         netbuf.layer3Data = (unsigned char*)&header;
         netbuf.layer3Size = sizeof(struct IPHeader);
-        netbuf.layer4Data = (unsigned char*)buffer;
-        netbuf.layer4Size = payloadSize;
 
         // Warning, we are working with big-endian here
         unsigned short r = net_send(interface, destMAC, 0x0100, 0x0008, &netbuf);
         if (r==0)
         {
-            return 0;
+            return IP_SEND_ERROR_HW;
         }
-        ret+=r;
+        ret+=(r-sizeof(struct IPHeader));
 
         offset+= size;
     }

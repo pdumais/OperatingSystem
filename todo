@@ -1,9 +1,7 @@
 - TCP stack
-    - send(s,buf,size)
-        - send_tcp_message will need to fragment if packet too big
-          Will need to do that without blocking
-        - systemlib implementation
-    - listen(s,port,ip) and acceptConnection()
+    - listen(s,port,ip) 
+        sets up half of socket.
+        automatically acceptConnection()
     - make telnet application
     - arp_getMAC should not block.
         Upon connecting a socket, ARP discovery and DNS resolution
@@ -17,7 +15,6 @@
         The connection will then be resumed. Once the an ARP entry
         is found for a socket, it will be saved in the socket and
         reused for all remaining transmission.
-    - dns resolution for connect()
 
 - hexdump app: should be able to pass filename through command-line params
     - should get pushed on stack?
@@ -25,13 +22,16 @@
       might not have access right to mirrorspace
 
 ------------ To do later -------------------------------
+- memory pool: use it in block cache and tcp
+- networking
+    - udp sockets
+    - dns resolution for connect()
 - fat32 driver
 - currently, ring3 apps can access kernel mem since kernel mem is not protected.
     lock kernel code, bios area, kernel data, IDT (read only)
     video mem, page tables
 - block cache: the block cache is not multi-cpu friendly (see doc/blockcache)
     would need a test suite to handle all normal cases and concurrency cases
-- memory pool: use it in block cache
 - serial port: can feed console like keyboard, could make a separate flush function
 - IRQ sharing is inneficient: ie: rtl8139 loops trhough 32 devices and checks ISR
     should stop looping when seeing first empty device and and should check ISR faster
@@ -67,4 +67,64 @@ solution:           softirq should lock socket. thread should try to lock socket
 socket list locking:
 problem to solve:   make that only one consumer at a time can append/remove from the 
                     list.
+
+
+net_send: will send 1 frame of maximum MTU size.
+      returns 0 if sending failed or size of frame
+      if sending failed. Frames are guaranteed to be sent
+      in full
+
+ip_send: will send a packet of maximum 65536 bytes.
+
+if net_send returns 0, because of HW buffer overflow, 
+then ip_send will return the number of bytes sent. but 
+tcp_send should not attempt to send the rest of the data
+because the IP protocol expects the rest of the packet.
+
+tcp_send: will send 1 segment of maximum 64k
+
 ---------------------------------
+
+Sending 
+20:47:55.079666 IP (tos 0x0, ttl 128, id 768, offset 0, flags [none], proto TCP (6), length 54)
+    192.168.1.28.32769 > 192.168.1.3.80: Flags [.], cksum 0x9c7f (correct), seq 1:15, ack 602230848, win 256, length 14
+    0x0000:  4500 0036 0300 0000 8006 b452 c0a8 011c  E..6.......R....
+    0x0010:  c0a8 0103 8001 0050 0000 0001 23e5 5040  .......P....#.P@
+    0x0020:  5010 0100 9c7f 0000 5468 6973 2069 7320  P.......This.is.
+    0x0030:  6120 7465 7374                           a.test
+
+We get the Ack
+20:47:55.080022 IP (tos 0x0, ttl 64, id 49126, offset 0, flags [DF], proto TCP (6), length 40)
+    192.168.1.3.80 > 192.168.1.28.32769: Flags [.], cksum 0xc5ce (correct), seq 602230848, ack 15, win 29200, length 0
+    0x0000:  4500 0028 bfe6 4000 4006 f779 c0a8 0103  E..(..@.@..y....
+    0x0010:  c0a8 011c 0050 8001 23e5 5040 0000 000f  .....P..#.P@....
+    0x0020:  5010 7210 c5ce 0000 0000 0000 0000       P.r...........
+
+Sending FIN
+20:47:55.601897 IP (tos 0x0, ttl 128, id 1024, offset 0, flags [none], proto TCP (6), length 40)
+    192.168.1.28.32769 > 192.168.1.3.80: Flags [F.], cksum 0x36d0 (correct), seq 29, ack 602230848, win 256, length 0
+    0x0000:  4500 0028 0400 0000 8006 b360 c0a8 011c  E..(.......`....
+    0x0010:  c0a8 0103 8001 0050 0000 001d 23e5 5040  .......P....#.P@
+    0x0020:  5011 0100 36d0 0000                      P...6...
+
+Peer acks 15 again!!!
+20:47:55.602230 IP (tos 0x0, ttl 64, id 49127, offset 0, flags [DF], proto TCP (6), length 40)
+    192.168.1.3.80 > 192.168.1.28.32769: Flags [.], cksum 0xc5ce (correct), seq 602230848, ack 15, win 29200, length 0
+    0x0000:  4500 0028 bfe7 4000 4006 f778 c0a8 0103  E..(..@.@..x....
+    0x0010:  c0a8 011c 0050 8001 23e5 5040 0000 000f  .....P..#.P@....
+    0x0020:  5010 7210 c5ce 0000 0000 0000 0000       P.r...........
+
+
+
+
+20:48:15.099576 IP (tos 0x0, ttl 64, id 49128, offset 0, flags [DF], proto TCP (6), length 40)
+    192.168.1.3.80 > 192.168.1.28.32769: Flags [F.], cksum 0xc5cd (correct), seq 602230848, ack 15, win 29200, length 0
+    0x0000:  4500 0028 bfe8 4000 4006 f777 c0a8 0103  E..(..@.@..w....
+    0x0010:  c0a8 011c 0050 8001 23e5 5040 0000 000f  .....P..#.P@....
+    0x0020:  5011 7210 c5cd 0000 0000 0000 0000       P.r...........
+20:48:15.099905 IP (tos 0x0, ttl 128, id 1280, offset 0, flags [none], proto TCP (6), length 40)
+    192.168.1.28.32769 > 192.168.1.3.80: Flags [.], cksum 0x36cf (correct), seq 30, ack 602230849, win 256, length 0
+    0x0000:  4500 0028 0500 0000 8006 b260 c0a8 011c  E..(.......`....
+    0x0010:  c0a8 0103 8001 0050 0000 001e 23e5 5041  .......P....#.PA
+    0x0020:  5010 0100 36cf 0000                      P...6...
+

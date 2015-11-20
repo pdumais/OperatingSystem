@@ -28,8 +28,6 @@ struct NetworkBuffer
 {
     unsigned char* payload;
     unsigned short payloadSize;
-    unsigned char* layer4Data;
-    unsigned short layer4Size;
     unsigned char* layer3Data;
     unsigned short layer3Size;
     unsigned char* layer2Data;

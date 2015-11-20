@@ -1,4 +1,6 @@
+#define IP_SEND_ERROR_NO_MAC -1
+#define IP_SEND_ERROR_HW -2
 
-unsigned short ip_send(unsigned long sourceInterface, unsigned int destIP, 
-    char* buffer, unsigned short payloadSize, unsigned char protocol);
+int ip_send(unsigned long sourceInterface, unsigned int destIP, 
+    char* buffers, unsigned short size, unsigned char protocol);
 

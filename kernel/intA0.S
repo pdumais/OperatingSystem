@@ -82,6 +82,8 @@ intA0:
     je          intA0_connect
     cmp         $INTA0_RECV,%rax
     je          intA0_recv
+    cmp         $INTA0_SEND,%rax
+    je          intA0_send
     jmp         intA0_exit
 
 intA0_get_apic_id:
@@ -174,6 +176,9 @@ intA0_connect:
     jmp         intA0_exit
 intA0_recv:
     call        recv
+    jmp         intA0_exit
+intA0_send:
+    call        send
     jmp         intA0_exit
 
 

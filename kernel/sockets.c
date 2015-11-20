@@ -62,16 +62,25 @@ uint16_t getEphemeralPort()
     return (uint16_t)atomic_increase_within_range(&ephemeralPort,EPHEMERAL_START,EPHEMERAL_END);
 }
 
-void send_tcp_message(socket* s, uint8_t control, char* payload, uint16_t size)
+int send_tcp_message(socket* s, uint8_t control, char* payload, uint16_t size)
 {
-    unsigned char tmp[1500];
+    //TODO: doing a copy here will slow down things. We should pass down header
+    //      and payload. But then again, eventually, we should buffer those segments
+    //      to allow tcp retransmission.
+    //      We should at least go through an object pool instead of using malloc
+    uint16_t segmentSize = sizeof(tcp_header)+size;
+    uint16_t paddedSegmentSize = (segmentSize+1)&~1; // make size a multiple of 2 bytes
+
+    char* tmp = (char*)malloc(paddedSegmentSize);
+    tmp[paddedSegmentSize-1] = 0;
+
     tcp_header *h = (tcp_header*)tmp;
     if (size>0)
     {
         unsigned char* payloadCopy = (unsigned char*)&tmp[sizeof(tcp_header)];
         memcpy64(payload,payloadCopy,size);
     }
-    
+ 
     uint64_t sourceInterface = (uint64_t)net_getInterfaceIndex(__builtin_bswap32(s->sourceIP));
 
     h->source = __builtin_bswap16(s->sourcePort);
@@ -84,8 +93,11 @@ void send_tcp_message(socket* s, uint8_t control, char* payload, uint16_t size)
     h->checksum = 0;
 
     //TODO: checksum does not pad
-    h->checksum = tcp_checksum((unsigned char*)h, size + sizeof(tcp_header), __builtin_bswap32(s->sourceIP), __builtin_bswap32(s->destinationIP));
-    ip_send(sourceInterface, s->destinationIP, h, sizeof(tcp_header)+size, 6);
+    h->checksum = tcp_checksum((unsigned char*)tmp, segmentSize, __builtin_bswap32(s->sourceIP), __builtin_bswap32(s->destinationIP));
+    int ret = ip_send(sourceInterface, s->destinationIP, tmp, segmentSize, 6);
+
+    free(tmp);
+    return (ret-sizeof(tcp_header));
 }
 
 socket* create_socket()
@@ -225,6 +237,22 @@ void destroy_sockets(uint64_t pid)
             }
         }
     }
+}
+
+uint16_t send(socket* s, char* buffer, uint16_t length)
+{
+    uint16_t sent = send_tcp_message(s, (1<<4), buffer, length);
+    s->tcp.seqNumber+=sent;
+
+    if (sent!=length)
+    {
+        //TODO: we must support this. But right now, the ip layer
+        //      wont work because fragmentation will be restarted on 
+        //      next resume. Or does it matter?
+      __asm("int $3");
+    }
+
+    return sent;
 }
 
 uint16_t recv(socket* s, char* buffer, uint16_t max)

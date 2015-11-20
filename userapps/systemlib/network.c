@@ -44,6 +44,14 @@ uint16_t recv(socket* s, char* buffer, uint16_t max)
     return ret;
 }
 
+uint16_t send(socket* s, char* buffer, uint16_t length)
+{
+    uint16_t ret;
+    __asm("int $0xA0" :"=a"(ret) : "D"(s),"S"(buffer),"d"(length), "a"(INTA0_SEND));
+    return ret;
+}
+
+
 uint32_t atoip(char* addr)
 {
     // TODO

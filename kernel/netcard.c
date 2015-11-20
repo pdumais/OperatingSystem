@@ -219,6 +219,6 @@ unsigned long net_send(unsigned char interface, unsigned long destinationMAC, un
         spinUnlock_softirq(&netcard->send_mutex);
         if (ret==0) retry--;
     }
-    return ret;
+    return ret-payloadIndex;
 }
 

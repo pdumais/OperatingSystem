@@ -116,6 +116,7 @@ tcp_checksum:
     mov     %rsi,%r8
 
     mov     %rsi,%rcx
+    inc     %rcx        // round up to next 2bytes
     shr     $1,%rcx     // we work on 16bit words, so divide byte count by two.
     mov     $0,%rax
     mov     $0,%rbx

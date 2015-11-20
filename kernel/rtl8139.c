@@ -275,10 +275,10 @@ unsigned long rtl8139_send(struct NetworkBuffer *netbuf, struct NetworkCard* net
 {
     struct RTL8139DeviceInfo* dev = (struct RTL8139DeviceInfo*)netcard->deviceInfo;
 
-    unsigned short size = netbuf->layer2Size+netbuf->layer3Size+netbuf->layer4Size+netbuf->payloadSize;
+    unsigned short size = netbuf->layer2Size+netbuf->layer3Size+netbuf->payloadSize;
     if (size>1792)
     {
-        pf("can't send. Frame too big: l2:%x, l3: %x, l4: %x payload size: %x\r\n",netbuf->layer2Size,netbuf->layer3Size,netbuf->layer4Size,netbuf->payloadSize);
+        pf("can't send. Frame too big: l2:%x, l3: %x, payload size: %x\r\n",netbuf->layer2Size,netbuf->layer3Size,netbuf->payloadSize);
         return 0;
     }
     unsigned short tsd = 0x10 + (dev->currentTXDescriptor*4);
@@ -297,8 +297,7 @@ unsigned long rtl8139_send(struct NetworkBuffer *netbuf, struct NetworkCard* net
         unsigned char *buf = dev->txbuf[dev->currentTXDescriptor];
         memcpy64((char*)&netbuf->layer2Data[0],(char*)&buf[0],netbuf->layer2Size);
         memcpy64((char*)&netbuf->layer3Data[0],(char*)&buf[netbuf->layer2Size],netbuf->layer3Size);
-        memcpy64((char*)&netbuf->layer4Data[0],(char*)&buf[netbuf->layer2Size+netbuf->layer3Size],netbuf->layer4Size);
-        memcpy64((char*)&netbuf->payload[0],(char*)&buf[netbuf->layer2Size+netbuf->layer3Size+netbuf->layer4Size],netbuf->payloadSize);
+        memcpy64((char*)&netbuf->payload[0],(char*)&buf[netbuf->layer2Size+netbuf->layer3Size],netbuf->payloadSize);
 
         tsdValue = size;
         OUTPORTL(tsdValue,dev->iobase+tsd);
