@@ -22,6 +22,7 @@ extern void yield();
 extern char* kernelAllocPages();
 extern unsigned int pci_getDeviceByClass(unsigned char class, unsigned char index, unsigned long* vendor, unsigned long* device);
 extern void ip_routing_addRoute(unsigned int network, unsigned int netmask, unsigned int gateway, unsigned char metric, unsigned long interface);
+extern void tcp_init();
 
 struct NetworkCard networkCards[32]={0};
 
@@ -74,6 +75,7 @@ void net_init()
 
     }
     ip_init();
+    tcp_init();
 }
 
 void net_start()

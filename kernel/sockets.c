@@ -6,11 +6,18 @@
 #define EPHEMERAL_START 32768
 #define EPHEMERAL_END 65535
 #define SOCKETBUFFERSIZE (1500*MAX_RINGBUFFER_SOCKET_MESSAGE_COUNT)
+#define MEMORY_POOL_COUNT 100
+
 extern uint64_t atomic_increase_within_range(uint64_t* var,uint64_t start, uint64_t end);
 extern uint16_t tcp_checksum(unsigned char* buffer, uint64_t bufsize, uint32_t srcBE, uint32_t dstBE);
 extern void* currentProcessVirt2phys(void* address);
 extern void* malloc(uint64_t size);
 extern void free(void* buffer);
+extern uint64_t create_memory_pool(uint64_t objSize, uint64_t count);
+extern void* reserve_object(uint64_t pool);
+extern void release_object(uint64_t pool, void* obj);
+extern void destroy_memory_pool(uint64_t pool);
+
 
 // TCP protocol implementation
 // This implementation is far from being up to specs. 
@@ -64,7 +71,18 @@ void tcp_send_rst(socket* s);
 void tcp_close(socket* s);
 
 volatile uint64_t ephemeralPort = EPHEMERAL_START;
+uint64_t tcpSegmentPool = 0;
 
+typedef struct
+{
+    tcp_header header;
+    char payload[65536-sizeof(tcp_header)];
+} tcp_segment;
+
+void tcp_init()
+{
+//    tcpSegmentPool = create_memory_pool(sizeof(tcp_segment),MEMORY_POOL_COUNT);
+}
 
 uint16_t getEphemeralPort()
 {
@@ -77,37 +95,43 @@ uint16_t getEphemeralPort()
 
 int send_tcp_message(socket* s, uint8_t control, char* payload, uint16_t size)
 {
-    // Doing a copy here will slow down things. We should pass down header
-    // and payload. But then again, eventually, we should buffer those segments
-    // to allow tcp retransmission.
+    if (size>(65536-sizeof(tcp_header))) return 0;
     uint16_t segmentSize = sizeof(tcp_header)+size;
     uint16_t paddedSegmentSize = (segmentSize+1)&~1; // make size a multiple of 2 bytes
 
-    char* tmp = (char*)malloc(paddedSegmentSize);
-    tmp[paddedSegmentSize-1] = 0;
+    // Doing a copy here will slow down things. We should pass down header
+    // and payload. But then again, eventually, we should buffer those segments
+    // to allow tcp retransmission. 
+    //TODO: should use memory pool instead of malloc
+    tcp_segment* segment = (tcp_segment*)malloc(sizeof(tcp_segment));
 
-    tcp_header *h = (tcp_header*)tmp;
+    if (segment == 0)
+    {
+        // hmmm, what should we do about that?
+        __asm("int $3");
+    }
+    segment->payload[paddedSegmentSize-1] = 0;
+
     if (size>0)
     {
-        unsigned char* payloadCopy = (unsigned char*)&tmp[sizeof(tcp_header)];
-        memcpy64(payload,payloadCopy,size);
+        memcpy64(payload,segment->payload,size);
     }
  
     uint64_t sourceInterface = (uint64_t)net_getInterfaceIndex(__builtin_bswap32(s->sourceIP));
 
-    h->source = __builtin_bswap16(s->sourcePort);
-    h->destination = __builtin_bswap16(s->destinationPort);
-    h->sequence = __builtin_bswap32(s->tcp.seqNumber);
-    h->acknowledgement = __builtin_bswap32(s->tcp.nextExpectedSeq);
-    h->flags = 0x5000|control;
-    h->flags = __builtin_bswap16(h->flags);
-    h->window = __builtin_bswap16(0x100);
-    h->checksum = 0;
+    segment->header.source = __builtin_bswap16(s->sourcePort);
+    segment->header.destination = __builtin_bswap16(s->destinationPort);
+    segment->header.sequence = __builtin_bswap32(s->tcp.seqNumber);
+    segment->header.acknowledgement = __builtin_bswap32(s->tcp.nextExpectedSeq);
+    segment->header.flags = 0x5000|control;
+    segment->header.flags = __builtin_bswap16(segment->header.flags);
+    segment->header.window = __builtin_bswap16(0x100);
+    segment->header.checksum = 0;
 
-    h->checksum = tcp_checksum((unsigned char*)tmp, segmentSize, __builtin_bswap32(s->sourceIP), __builtin_bswap32(s->destinationIP));
-    int ret = ip_send(sourceInterface, s->destinationIP, tmp, segmentSize, 6);
+    segment->header.checksum = tcp_checksum(segment, segmentSize, __builtin_bswap32(s->sourceIP), __builtin_bswap32(s->destinationIP));
+    int ret = ip_send(sourceInterface, s->destinationIP, segment, segmentSize, 6);
 
-    free(tmp);
+    free(segment);
     return (ret-sizeof(tcp_header));
 }
 
