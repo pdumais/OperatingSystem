@@ -12,7 +12,6 @@
 .global markPageAsInUse
 .global kernelAllocPages
 .global kernelReleasePages
-.global userAllocPages
 .global mapPhysOnVirtualAddressSpace
 .global calculateMemoryUsage
 .global currentProcessVirt2phys
@@ -281,98 +280,6 @@ mapPhysOnVirtualAddressSpace:
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-// userAllocPages(rdi=pagecount)
-// retrun: rax=virtual address
-// This will reserve <pagecount> physical pages and allocates them to a contiguous
-// virtual memory region. 
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-userAllocPages:
-    push        %rsi
-    push        %r13
-    push        %r12
-    push        %r11
-    push        %r10
-    push        %rdx
-    push        %rbx
-    push        %rcx
-    mov         %rdi,%rcx    
-
-    // For all page entry from CodeStart to Current Stack Page
-    //      if page is free
-    //          if rdx==0, rdx= that page virtual address
-    //          atomically reserve page
-    //          if failed, 
-    //              call unreserve(rdx,r11)
-    //          else
-    //              inc r11
-    //      else
-    //          call unserve(rdx,r11)
-    //      if r11== requested count, return.
-    //
-    // Loop through all page entry up until current bottom of stack
-    mov         %rsp,%r10
-    and         $~0xFFF,%r10
-    xor         %rdx,%rdx
-    xor         %r11,%r11
-    mov         $THREAD_CODE_START,%rdi
-1:  call        getPTEntry
-    mov         %rax,%rsi
-    mov         (%rsi),%rax
-    test        $0b111000000000,%rax    // is the page free? check the 3 AVL bits, should be zero
-    jne         2f
-    mov         %rax,%rbx
-    or          $0b011000000111,%rbx    
-    lock cmpxchg %rbx,(%rsi)
-    jnz         unreserve               // page changed by another thread meanwhile
-    cmp         $0,%rdx
-    jne         4f
-    mov         %rdi,%rdx
-4:  inc         %r11
-    jmp         3f
-2:  xor         %rdx,%rdx
-    xor         %r11,%r11
-3:  cmp         %rcx,%r11
-    je          5f
-    add         $0x1000,%rdi
-    add         $0x1000,%r13
-    cmp         %r10,%rdi
-    jb          1b
-    jmp         unreserve               // we got the the end and couldn't reserve mem 
-
-5:  mov         %rdx,%rax
-    and         $~0xFFF,%rax
-
-        
-    // At this point, the virtual addresses have been reserved
-    // Now for each page, allocate a physicial page
-    mov         %rax,%rdi
-    mov         %rcx,%rsi    
-    call        reservePhysicalMemoryForVirtualRange
-    //TODO: should check if enough physical mem was found
-
-    pop         %rcx
-    pop         %rbx
-    pop         %rdx
-    pop         %r10
-    pop         %r11
-    pop         %r12
-    pop         %r13
-    pop         %rsi
-    ret
-
-unreserve:
-    // unreserve:
-    //          for all pages from rdx, up to count of r11, marke page as free
-    //          r11=0
-    //          rdx=0
-    //TODO should implement this
-    STALL()
-
-
-
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
 //  reservePhysicalMemoryForVirtualRange(rdi=virtual_address, rsi=pageCount)
 //  Warning: this is not multi-thread friendly. It will change page entries but
 //  assumes that the caller is the owner of those pages.
@@ -416,6 +323,10 @@ reservePhysicalMemoryForVirtualRange:
 // Function: currentProcessVirt2phys(rdi=virtual_address)
 //   RETURN %rax= physical address in mirror addressing space
 //                will return 0 if page not present
+//   WARNING: do not use this function with memory alocated with malloc.
+//            malloc's buffer might cross a page boundary and there is no
+//            guarantee that pages are mapped continguously in ram.
+//            so using physical address would be dangerous.
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 currentProcessVirt2phys:

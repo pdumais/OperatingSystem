@@ -1,11 +1,18 @@
 - cleanup doc/net
 - physical memory
     sockets and console buffers are created using malloc and then using the mirror address
-    but if those buffers span accross pages, the 2nd portion might not map contiguously
-    so this would fail. When creating buffers that are shared between processes, we
+    But if those buffers span accross pages, the 2nd portion might not map contiguously
+    so this would fail. Also, on #PF, the handle would see the mirror address and it would fail.
+    When creating buffers that are shared between processes, we
     should either make sure that the memory will be contigous in physical memory or change
     cr3 before using it.
- 
+        sockets with internal buffer
+        console with internal buffer
+        file handles 
+
+    make a allocateObject(). Would return a mirror address and guarantee the object lies
+    in coutiguous phys mem. Should do it in some block cache?
+
 - application
     - web server: serve files from ata disk
     - telnet client application
