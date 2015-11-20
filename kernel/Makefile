@@ -16,6 +16,7 @@ all: kernel
 kernel: $(OBJASM) $(OBJC)
 	@printf "\r\n========== Linking =============\r\n"
 	ld -m elf_x86_64 -static --oformat=binary -T link.lds $(OBJASM) $(OBJC) -o kernel.o
+	ld -m elf_x86_64 -static -T link.lds $(OBJASM) $(OBJC) -o kerneldump.o
 	echo -n ".EQU KERNEL_SIZE, " > ../sizekernel.inc
 	wc -c < kernel.o >> ../sizekernel.inc
 	

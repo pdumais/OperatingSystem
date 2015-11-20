@@ -13,4 +13,8 @@ Specifications:
     supports RTL8139 netcard on PCI bus
     on main thread:
         pressing '0' shows mem, pressing '1' launches bootscript
+    networking works but not fully tested
+        - can receive connection and establish one
+        - send/rcv
+        - so failure testing
 

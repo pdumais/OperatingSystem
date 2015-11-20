@@ -48,6 +48,57 @@ layer7 that is responsible of reconstructing full messages
 
 
 
+--------------------------------------------------------------
+arp_getMAC should not block:
+        Upon connecting a socket, ARP discovery and DNS resolution
+        might need to be performed. DNS resolution will be left to
+        the user to do. connect() will require an IP address. Upon
+        connect, the socket will be placed in "arp discovery" state.
+        The MAC address will be fetched from the cache or a discovery
+        will be sent. Upon receiving an ARP reply, or any other ARP
+        cache entry addition, the stack will search through the
+        socket list for sockets that are waiting for that entry.
+        The connection will then be resumed. Once the an ARP entry
+        is found for a socket, it will be saved in the socket and
+        reused for all remaining transmission.
+
+
+--------------------------------------------------------------
+socket locking:
+Problem to solve:   1) make sure a thread does not delete its socket while softIRQ is
+                       using it.
+                    2) a thread might want to get the seqnumber while the softirq is
+                       playing with it
+
+solution:           softirq should lock socket. thread should try to lock socket
+                    before trying to delete it. then it will delete it and remove
+                    it from list. This is a guarantee that no deleted socket will
+                    be stored in the list.
+                    ANOTHER PROBLEM: if the softIRQ is waiting on socket release
+                                     and the thread releases it?
+
+socket list locking:
+problem to solve:   make that only one consumer at a time can append/remove from the
+                    list.
+------------------------
+
+net_send: will send 1 frame of maximum MTU size.
+      returns 0 if sending failed or size of frame
+      if sending failed. Frames are guaranteed to be sent
+      in full
+
+ip_send: will send a packet of maximum 65536 bytes.
+
+if net_send returns 0, because of HW buffer overflow,
+then ip_send will return the number of bytes sent. but
+tcp_send should not attempt to send the rest of the data
+because the IP protocol expects the rest of the packet.
+
+tcp_send: will send 1 segment of maximum 64k
+
+
+
+
 
 
 

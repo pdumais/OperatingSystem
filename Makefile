@@ -26,7 +26,8 @@ clean:
 	cd userapps && make clean
 
 disasm:
-	objdump -D -b binary -mi386 -M x86-64 kernel/kernel.o 
+	#objdump -D -b binary -mi386 -M x86-64 kernel/kernel.o 
+	objdump -D -mi386 -M x86-64 kernel/kerneldump.o 
 
 tunctl:
 	tunctl -u pat -t tap2 

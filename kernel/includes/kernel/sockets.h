@@ -13,6 +13,8 @@
 #define SOCKET_STATE_WAITSYNACK 1
 #define SOCKET_STATE_CONNECTED 2
 #define SOCKET_STATE_CLOSING 4
+#define SOCKET_STATE_LISTENING 5
+#define SOCKET_STATE_CONNECTING 6
 #define SOCKET_STATE_CLOSED 0x80
 #define SOCKET_STATE_RESET 0x81
 
@@ -36,7 +38,9 @@ struct _socket
     tcp_state tcp;
     struct _socket* next;                       
     struct _socket* previous;                       
+    struct _socket* backlog;                       
     
+    uint16_t backlogSize;
     uint32_t destinationIP;
     uint32_t sourceIP;
     uint16_t destinationPort;

@@ -4,8 +4,10 @@
 socket* create_socket();
 void close_socket(socket* s);
 void connect(socket *s, uint32_t destination, uint16_t port);
-uint16_t recv(socket* s, char* buffer, uint16_t max);
-uint16_t send(socket* s, char* buffer, uint16_t length);
+void listen(socket*s, uint32_t source, uint16_t port, uint16_t backlog);
+socket* accept(socket*s);
+int recv(socket* s, char* buffer, uint16_t max);
+int send(socket* s, char* buffer, uint16_t length);
 char isconnected(socket* s);
 char isclosed(socket* s);
 void resolveDNS(char* host);

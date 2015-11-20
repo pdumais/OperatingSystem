@@ -84,6 +84,10 @@ intA0:
     je          intA0_recv
     cmp         $INTA0_SEND,%rax
     je          intA0_send
+    cmp         $INTA0_LISTEN,%rax
+    je          intA0_listen
+    cmp         $INTA0_ACCEPT,%rax
+    je          intA0_accept
     jmp         intA0_exit
 
 intA0_get_apic_id:
@@ -179,6 +183,12 @@ intA0_recv:
     jmp         intA0_exit
 intA0_send:
     call        send
+    jmp         intA0_exit
+intA0_listen:
+    call        listen
+    jmp         intA0_exit
+intA0_accept:
+    call        accept
     jmp         intA0_exit
 
 

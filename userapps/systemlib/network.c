@@ -37,20 +37,31 @@ char isclosed(socket* s)
     return 0;
 }
 
-uint16_t recv(socket* s, char* buffer, uint16_t max)
+int recv(socket* s, char* buffer, uint16_t max)
 {
-    uint16_t ret;
+    int ret;
     __asm("int $0xA0" :"=a"(ret) : "D"(s),"S"(buffer),"d"(max), "a"(INTA0_RECV));
     return ret;
 }
 
-uint16_t send(socket* s, char* buffer, uint16_t length)
+int send(socket* s, char* buffer, uint16_t length)
 {
-    uint16_t ret;
+    int ret;
     __asm("int $0xA0" :"=a"(ret) : "D"(s),"S"(buffer),"d"(length), "a"(INTA0_SEND));
     return ret;
 }
 
+void listen(socket*s, uint32_t source, uint16_t port, uint16_t backlog)
+{
+    __asm("int $0xA0" : : "D"(s),"S"(source),"d"(port),"c"(backlog), "a"(INTA0_LISTEN));
+}
+
+socket* accept(socket*s)
+{
+    socket* ret;
+    __asm("int $0xA0" :"=a"(ret) : "D"(s), "a"(INTA0_ACCEPT));
+    return ret;
+}
 
 uint32_t atoip(char* addr)
 {

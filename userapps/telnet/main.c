@@ -10,7 +10,7 @@ int main(uint64_t param)
 
     socket* s = create_socket();
 
-    uint32_t ip = 0x0301A8C0;    
+    /*uint32_t ip = 0x0301A8C0;    
     connect(s,ip,80);
 
     char r=0;
@@ -42,8 +42,62 @@ int main(uint64_t param)
         close_socket(s);
         r=0;
         while (!r) r = isclosed(s);
+    }*/
+
+    listen(s,0x1C01A8C0,242,2);
+    printf("listening\r\n");
+    socket *s2 = 0;
+    while (!s2)
+    {
+        s2 = accept(s);
+    }
+    printf("Accepted\r\n");
+    while (!isconnected(s2));
+    printf("connected\r\n");
+    send(s2,"Hello!\r\n",8);
+
+    char cmd[255];
+    char rbuf[255];
+    uint8_t index = 0;
+    cmd[0] = 0;
+   
+    char ch; 
+    while (!strcompare(cmd,"quit"))
+    {
+        ch = poll_in();
+        if ((ch>='0' && ch<='9')||(ch>='a' && ch<='z')||(ch>='A' && ch<='Z')||(ch==' ')) 
+        {
+            cmd[index] = ch;
+            index++;
+            cmd[index]=0;
+            printf("\r%s\003",cmd);
+        }
+        else if (ch == 0x0A)
+        {
+            send(s2,cmd,index);
+            index = 0;
+            cmd[index]=0;
+            printf("\r\n");
+        }
+        int received = recv(s2,rbuf,254);
+        if (received == -1)
+        {
+            printf("Connection closed by peer\r\n");
+            break;
+        }
+        else if (received > 0)
+        {
+            rbuf[received] = 0;
+            printf("[%s]\r\n",rbuf);
+        }
+        
     }
 
+    printf("Closing sockets\r\n");
+    close_socket(s);
+    close_socket(s2);
+    while (!isclosed(s) || !isclosed(s2));
+    release_socket(s2);
     release_socket(s);
-
+    printf("goodbye\r\n");
 }
