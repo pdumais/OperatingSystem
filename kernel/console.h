@@ -6,7 +6,7 @@ struct ConsoleData
 {
     system_handle   handle;
 
-    char*       backBuffer;
+    char        backBuffer[4096]; //TODO should be smaller
     uint64_t    streamPointer; 
     uint64_t    backBufferPointer; 
     char        streamBuffer[512];

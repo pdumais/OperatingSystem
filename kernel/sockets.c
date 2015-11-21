@@ -5,7 +5,6 @@
 
 #define EPHEMERAL_START 32768
 #define EPHEMERAL_END 65535
-#define SOCKETBUFFERSIZE (1500*MAX_RINGBUFFER_SOCKET_MESSAGE_COUNT)
 #define MEMORY_POOL_COUNT 100
 
 extern uint64_t atomic_increase_within_range(uint64_t* var,uint64_t start, uint64_t end);
@@ -13,10 +12,6 @@ extern uint16_t tcp_checksum(unsigned char* buffer, uint64_t bufsize, uint32_t s
 extern void* currentProcessVirt2phys(void* address);
 extern void* malloc(uint64_t size);
 extern void free(void* buffer);
-extern uint64_t create_memory_pool(uint64_t objSize, uint64_t count);
-extern void* reserve_object(uint64_t pool);
-extern void release_object(uint64_t pool, void* obj);
-extern void destroy_memory_pool(uint64_t pool);
 
 
 // TCP protocol implementation
@@ -71,7 +66,7 @@ void tcp_send_rst(socket* s);
 void tcp_close(socket* s);
 
 volatile uint64_t ephemeralPort = EPHEMERAL_START;
-uint64_t tcpSegmentPool = 0;
+uint64_t socket_pool = -1;
 
 typedef struct
 {
@@ -81,7 +76,7 @@ typedef struct
 
 void tcp_init()
 {
-//    tcpSegmentPool = create_memory_pool(sizeof(tcp_segment),MEMORY_POOL_COUNT);
+    socket_pool = create_memory_pool(sizeof(socket));
 }
 
 uint16_t getEphemeralPort()
@@ -141,7 +136,6 @@ socket* create_socket()
     memclear64(s,sizeof(socket));
 
     s->handle.destructor = &socket_destructor;
-    s->messages = (char*)currentProcessVirt2phys(malloc(SOCKETBUFFERSIZE));
 
     __asm("mov %%cr3,%0" : "=r"(s->owner));
     add_socket_in_list(s);
@@ -170,10 +164,7 @@ void delete_socket(socket* s)
     if (s->backlog)
     {
         //TODO: should delete all those connections?
-        free((void*)s->backlog);
-        s->backlog = 0;
     }
-    free((void*)s->messages);
     free((void*)s);
 }
 
@@ -187,6 +178,8 @@ void release_socket(socket* s)
     delete_socket(s);
 }
 
+//TODO: This call is not trully non-blocking. The underlying ARP query
+//      might block if entry not in cache
 void connect(socket *s, uint32_t ip, uint16_t port)
 {
     //TODO: The source IP should be given to the IP layer and let it
@@ -207,8 +200,7 @@ void connect(socket *s, uint32_t ip, uint16_t port)
 
 void listen(socket*s, uint32_t source, uint16_t port, uint16_t backlog)
 {
-    s->backlog = (socket*)currentProcessVirt2phys(malloc(sizeof(socket)*backlog));
-    memclear64(s->backlog,sizeof(socket)*backlog);
+    memclear64(s->backlog,sizeof(socket_info)*backlog);
     s->backlogSize = backlog;
     s->destinationIP = 0;
     s->destinationPort = 0;
@@ -245,7 +237,6 @@ socket* accept(socket*s)
             s2->sourcePort = s->backlog[i].sourcePort;
             s2->destinationIP = s->backlog[i].destinationIP;
             s2->destinationPort = s->backlog[i].destinationPort;
-            s2->messages = (char*)currentProcessVirt2phys(malloc(SOCKETBUFFERSIZE));
             __asm("mov %%cr3,%0" : "=r"(s2->owner));
             add_socket_in_list(s2);
 
@@ -367,10 +358,10 @@ int recv(socket* s, char* buffer, uint16_t max)
     uint16_t ret = 0;
     while (ret!=max)
     {
-        buffer[ret] = s->messages[s->qout];
+        buffer[ret] = s->receivedSegments[s->qout];
         ret++;
         s->qout++;
-        if (s->qout >= SOCKETBUFFERSIZE) s->qout = 0;
+        if (s->qout >= RING_BUFFER_SIZE) s->qout = 0;
         if (s->qout == s->qin) break;
     }
 
@@ -466,11 +457,11 @@ void tcp_add_segment_in_queue(socket* s,char* payload,uint16_t size)
     //TODO: should do this in assembly
     while (size)
     {
-        s->messages[s->qin] = *payload;
+        s->receivedSegments[s->qin] = *payload;
         payload++;
         size--;
         s->qin++;
-        if (s->qin >= SOCKETBUFFERSIZE) s->qin = 0;
+        if (s->qin >= RING_BUFFER_SIZE) s->qin = 0;
         if (s->qin == s->qout)
         {
             // TODO: BUFFER OVERRUN!!! close connection
@@ -494,12 +485,12 @@ void tcp_process_syn(socket* s, char* payload, uint16_t size,
         for (slot = 0; slot < s->backlogSize; slot++) if (s->backlog[slot].tcp.state == 0) break;
         if (slot == s->backlogSize)
         {
-            //TODO DUMAIS: send rst. backlog is full
+            //TODO: send rst. backlog is full
             return;    
         } 
 
         //__asm("int $3");
-        socket* s2 = &(s->backlog[slot]);
+        socket_info* s2 = &(s->backlog[slot]);
         s2->tcp.state = SOCKET_STATE_CONNECTING;    
         s2->sourceIP = s->sourceIP;
         s2->sourcePort = s->sourcePort;

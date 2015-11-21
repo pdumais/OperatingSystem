@@ -1,17 +1,14 @@
-- cleanup doc/net
-- physical memory
-    sockets and console buffers are created using malloc and then using the mirror address
-    But if those buffers span accross pages, the 2nd portion might not map contiguously
-    so this would fail. Also, on #PF, the handle would see the mirror address and it would fail.
-    When creating buffers that are shared between processes, we
-    should either make sure that the memory will be contigous in physical memory or change
-    cr3 before using it.
-        sockets with internal buffer
-        console with internal buffer
-        file handles 
-
-    make a allocateObject(). Would return a mirror address and guarantee the object lies
-    in coutiguous phys mem. Should do it in some block cache?
+- socket, console and file_handle should not be created with malloc
+    This is pretty much what kernelAllocPages does. But we don't want to reserve 
+    whole pages. So we should build a memory pool
+        - in order to not have to reserve several pages at once,
+          each object should be in a linked list. The whole node(pointers and object)
+          must be guaranteed to reside on consecutive mem. 
+            - when creating the pool, convert the object size to pageCount
+            - when creating a new node, reserve pageCount pages.
+            - should pack several if they fit in same page
+            - not mapped in any virtual space. Only accessible from mirror area
+            - returns physical address
 
 - application
     - web server: serve files from ata disk
@@ -26,9 +23,8 @@
 - networking
     - udp sockets
     - dns resolution for connect()
-    - stack stack still needs a lot of improvements (doc/net)
+    - stack still needs a lot of improvements (doc/net)
     - arp_getMAC should not block.
-- memory pool: continue memorypool.S and use it in send_tcp_message()
 - fat32 driver
 - currently, ring3 apps can access kernel mem since kernel mem is not protected.
     lock kernel code, bios area, kernel data, IDT (read only)
@@ -54,35 +50,3 @@
 
 ======================================================================================
 
-TODO: the synack can only be sent when the socket is accepted.
-      because we can only create the socket's buffer from the accepting process.
-
-Accepting connections
-A socket is created using create_socket(). Then the socket is placed in listening mode with
-listen(). listen() will set the source ip/port of the socket as per parameters of the function
-and destination ip/port to 0. A backlog buffer is created with size=(sizeof(socket*)*backlogCount).
-
-When a segment is processed by tcp_process (in softirq context), a socket will try to be matched.
-If no socket is found then tcp_process() will try to find a listening socket that uses the same
-source ip/port (matching the received segment's destination fields) and with destination ip/port set to 0.
-if a socket is found, then we know that this segment is for an incomming connection.
-
-The listening socket will only process SYN segments and will ignore any other segments.
-When processing a SYN segment, it will create a new socket with the same source ip/port
-and with destination ip/port matching the source of the incomming segment. The state will be set
-to CONNECTING. The new socket will be saved in the listening socket's backlog. The new socket will 
-stay in the backlog until it gets picked up by accept(). accept() will then move the socket to 
-the main list. The socket created in the backlog is only temporary. accept() will create a new
-socket instance based on that socket so that the new instance will reside in the accepting 
-process's heap.
-
-When the accept function is called, it will go through the backlog of the listening socket
-and will finish creating the socket. It will clone the socket and create the receive buffer 
-and send the syn/ack. The socket will stay in "CONNECTING" state until it receives the ack 
-of the syn/ack accept will move the socket from the backlog to the main list.
-
-s = find_socket(src,dst)
-if (s == 0)
-    s =find_listening_socket(src,0)
-
-TODO: what if socket in backlog receives a FIN/RST????

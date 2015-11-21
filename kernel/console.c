@@ -235,7 +235,7 @@ void flushTextVideo()
     char* outputBuffer;
 
     rwlockReadLock(&frontLineSwitchLock);
-    outputBuffer = cd->backBuffer;
+    outputBuffer = &cd->backBuffer;
     isFrontLine = 0;
     if (frontLineConsoleIndex != -1 && consoles[frontLineConsoleIndex] != 0)
     {
@@ -349,12 +349,10 @@ struct ConsoleData* createTextConsoleForProcess()
     struct ConsoleData** consoleDataPointer;
     consoleDataPointer = (struct ConsoleData**)CONSOLE_POINTER;
 
-    char* videoBuffer = (char*)malloc(4096); //TODO: put appropriate size
-    struct ConsoleData* consoleInfo = (struct ConsoleData*)malloc(4096); //TODO: put appropriate size
+    struct ConsoleData* consoleInfo = (struct ConsoleData*)malloc(sizeof(struct ConsoleData));
     *consoleDataPointer = consoleInfo;
 
-    memclear64(videoBuffer,(2*80*25));
-    consoleInfo->backBuffer = (char*)currentProcessVirt2phys(videoBuffer);
+    memclear64(consoleInfo,sizeof(struct ConsoleData));
     //if (consoles[0] != 0) __asm("mov %0,%%rax; int $3" : : "r"(consoleInfo->backBuffer));
     consoleInfo->handle.destructor = &destroy_text_console_handle;
     consoleInfo->streamPointer = 0;

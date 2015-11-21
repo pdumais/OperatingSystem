@@ -1,104 +1,140 @@
-http://www.tldp.org/HOWTO/KernelAnalysis-HOWTO-8.html
-http://www.cubrid.org/blog/dev-platform/understanding-tcp-ip-network-stack/
-http://1.bp.blogspot.com/_Y6kJq_O7xJw/So8Vg9IQJXI/AAAAAAAAADo/G5Jk-Cjadto/s1600-h/TCP_Ingress_Queuing.png
+#TCP/IP stack
 
-tcp_v4_do_rcv
-    tcp_ack_snd_check 
-
-so the ack is sent from the softIRQ? 
-    - but my send function has a lock. We cannot, or should not, lock in the softIRQ.
-      because if another thread has that lock we would deadlock.
-    - and what if the driver cant send anymore because Q is full? the softIRQ would spin retrying.
-    
-    - unless we clear interrupts and then spinlock
-        1 - spinlock will prevent another CPU from accessing the send function
-        2 - the thread could not be preempted on the local CPU so there is no chances
-            that a softIRQ would deadlock (since softIIRQ are prioritized over that 
-            thread, it could continue to run and never give time to the thread to 
-            release the lock). 
-        3 - On a single-CPU system, the interrupt cleared and spinlock would be
-            redundant but would not cause a problem
-
-
-Current network implementation:
-
-receiving a message:
-the netcard abstraction's net_process() function, invoked
-by the softirq, agglomerates messages from all netcards and
-distributes them to the ICMP or IP handlers.
+##Receiving data
+The netcard abstraction's net_process() function, invoked
+by the softirq, iterates through each netcards and distributes
+frames to the ICMP or IP handlers.
 
 The ICMP handler responds immediately to ping requests. The IP
 handler forwards the message to the TCP or UDP handlers. The
 UDP handler is not implemented yet. The TCP handler forwards
-the message to active sockets by finding the socket listening
-to the port and ip of the message. The message is added in 
-the socket's message queue while locking the list
+segments to active sockets by finding the socket listening
+to the port and ip of the message. The message is added in
+the socket's queue.
 
-sending a message
-the netcard abstraction's net_send() function locks
-the netcard implementation's send spinlock.
+##Sending data
+The netcard abstraction's net_send() function locks
+the netcard implementation's send spinlock. This way, only
+one thread can can send one one given netcard at the same time.
 
 net_send() takes an interface index as destination parameter.
 ip_send takes an ip address as destination parameter. ip_send
 invokes ip_routing_route() to determine on what netcard
 to send the message based the destination address.
 
-tcp has no notion of size. A segment is a segment. It is the 
-layer7 that is responsible of reconstructing full messages
+net_send() will send 1 frame of maximum MTU size. It returns 0 if sending failed 
+or size of frame if sending suceeded. Frames are guaranteed to be sent in full or
+not at all but never partly.
 
+ip_send() will send a packet of maximum 65536 bytes. It will do ip fragmentation
+in order to send frames of appropriate size.
 
+tcp_send() will send 1 segment of maximum 64k.
 
---------------------------------------------------------------
-arp_getMAC should not block:
-        Upon connecting a socket, ARP discovery and DNS resolution
-        might need to be performed. DNS resolution will be left to
-        the user to do. connect() will require an IP address. Upon
-        connect, the socket will be placed in "arp discovery" state.
-        The MAC address will be fetched from the cache or a discovery
-        will be sent. Upon receiving an ARP reply, or any other ARP
-        cache entry addition, the stack will search through the
-        socket list for sockets that are waiting for that entry.
-        The connection will then be resumed. Once the an ARP entry
-        is found for a socket, it will be saved in the socket and
-        reused for all remaining transmission.
-
-
---------------------------------------------------------------
-socket locking:
-Problem to solve:   1) make sure a thread does not delete its socket while softIRQ is
-                       using it.
-                    2) a thread might want to get the seqnumber while the softirq is
-                       playing with it
-
-solution:           softirq should lock socket. thread should try to lock socket
-                    before trying to delete it. then it will delete it and remove
-                    it from list. This is a guarantee that no deleted socket will
-                    be stored in the list.
-                    ANOTHER PROBLEM: if the softIRQ is waiting on socket release
-                                     and the thread releases it?
-
-socket list locking:
-problem to solve:   make that only one consumer at a time can append/remove from the
-                    list.
-------------------------
-
-net_send: will send 1 frame of maximum MTU size.
-      returns 0 if sending failed or size of frame
-      if sending failed. Frames are guaranteed to be sent
-      in full
-
-ip_send: will send a packet of maximum 65536 bytes.
-
-if net_send returns 0, because of HW buffer overflow,
-then ip_send will return the number of bytes sent. but
-tcp_send should not attempt to send the rest of the data
+###Problem
+if net_send() returns 0, because of HW buffer overflow, then ip_send will return the 
+number of bytes sent. But tcp_send should not attempt to send the rest of the data
 because the IP protocol expects the rest of the packet.
 
-tcp_send: will send 1 segment of maximum 64k
+#Blocking operations
+All socket operations such as connect, accept, send, receive and close are 
+non-blocking. This implies that the lower-level layer operations are non-blocking
+also. There is currently one exception to this that needs to be solved.
+
+##Problem:
+Upon connecting a socket, ARP discovery and DNS resolution might need to be 
+performed. DNS resolution will be left to the user to do. connect() will require an 
+IP address. Upon connect, the socket will be placed in "arp discovery" state. The MAC
+address will be fetched from the cache or a discovery will be sent. Upon receiving an
+ARP reply, or any other ARP cache entry addition, the stack will search through the
+socket list for sockets that are waiting for that entry. The connection will then be 
+resumed. Once the an ARP entry is found for a socket, it will be saved in the socket 
+and reused for all remaining transmission.
+
+#Locking
+At any time, only two threads can access the tcp/ip stack: The softIRQ thread, 
+for processing incomming frames, and the owner of the socket. If multiple
+threads want to share socket usage, they will have to implement their own
+locking mechanism. The tcp/ip stack will only guarantee thread safety between
+the two threads mentioned above. This behaviour is similar to other operating 
+systems. Sockets should be used by one thread only in a user application.
+
+##net_send() locking
+net_send() is used by the softIRQ context and user threads. Since
+the softIRQ context has high priority, it means that if a thead
+is preempted while it was holding the netcard's send spinlock, and 
+then the softIRQ attempts to request the lock, a deadlock might occur.
+On uni-CPU systems, a deadlock would occur because the softIRQ will
+never give CPU time to other threads until it has completed its work.
+This could also happen on systems where the number of netcard is 
+greater than or equal to the number of CPUs.
+
+To solve this problem, the spinlock will disable interrupts.
+    - Spinlock will prevent another CPU from accessing the send function
+    - The thread would not be preempted on the local CPU so there is no chances
+      that a softIRQ would deadlock (since softIRQ are prioritized over that
+      thread, it could continue to run and never give time to the thread to
+      release the lock).
+    - On a single-CPU system, the interrupt cleared and spinlock would be
+      redundant but would not cause a problem
 
 
+##Socket locking
+No locking is currently done at the socket level. The following is a list
+of problems that would arise, and the associated solution
 
+###Problem 1
+    1) Make sure a thread does not delete its socket while softIRQ is using it.
+    2) A thread might want to get the seqnumber while the softirq is modifying it.
+    3) A thread might read in the receive queue while softIRQ is writing in it
+    
+Solution
+??????
 
+###Problem 2
+Make sure that only one consumer at a time can append/remove from the socket list.
 
+Solution
+??????
+      
+###Problem 3
+Socket backlog list might get accessed by softIRQ and owning thread
 
+Solution
+??????
+
+#Accepting incomming connections      
+A socket is created using create_socket(). Then the socket is placed in listening 
+mode with listen(). listen() will set the source ip/port of the socket as per 
+parameters of the function and destination ip/port to 0. A backlog buffer is created 
+with size=(sizeof(socket*)*backlogCount).
+
+When a segment is processed by tcp_process (in softirq context), a socket will try 
+to be matched. If no socket is found then tcp_process() will try to find a listening 
+socket that uses the same source ip/port (matching the received segment's destination
+fields) and with destination ip/port set to 0. if a socket is found, then we know 
+that this segment is for an incomming connection.
+
+The listening socket will only process SYN segments and will ignore any other 
+segments. When processing a SYN segment, it will create a new socket with the same 
+source ip/port and with destination ip/port matching the source of the incomming 
+segment. The state will be set to CONNECTING. The new pending socket will be saved 
+in the listening socket's backlog. The new socket will stay in the backlog until it 
+gets picked up by accept(). accept() will then move the socket to the main list. The 
+socket created in the backlog is only temporary. accept() will create a new socket 
+instance based on that socket so that the new instance will reside in the accepting
+process's heap.
+
+When the accept function is called, it will go through the backlog of the listening 
+socket and will finish creating the socket. It will clone the socket and create the 
+receive buffer and send the syn/ack. The socket will stay in "CONNECTING" state until 
+it receives the ack of the syn/ack accept will move the socket from the backlog to 
+the main list.
+
+      
+      
+#Links
+http://www.tldp.org/HOWTO/KernelAnalysis-HOWTO-8.html
+http://www.cubrid.org/blog/dev-platform/understanding-tcp-ip-network-stack/
+http://1.bp.blogspot.com/_Y6kJq_O7xJw/So8Vg9IQJXI/AAAAAAAAADo/G5Jk-Cjadto/s1600-h/TCP_Ingress_Queuing.png
 

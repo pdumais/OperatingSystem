@@ -172,7 +172,7 @@ malloc:
     jae         malloc_no_mem        // if currentAddress >= HEAP_TOP
 
     test        $0x0F,%rsi
-    jnz         heap_corrupted    
+    jnz         heap_corrupted1
 
     // r8 =  control bits
     mov         (%rsi),%r8
@@ -181,7 +181,7 @@ malloc:
     shr         $4,%rax             // clear upper 4 bits
 
     cmp         %rax,%rsi
-    jae         heap_corrupted
+    jae         heap_corrupted2
 
     // r9 = entry size (end-start)
     mov         %rax,%r9
@@ -230,8 +230,11 @@ malloc_no_mem:
     mov         $0xAAAAAAAA,%r15
     int         $3
     // TODO: should just return 0
-heap_corrupted:
-    mov         $0xDEADBEEF,%r15
+heap_corrupted1:
+    mov         $0xBEEF0001,%r15
+    int         $3
+heap_corrupted2:
+    mov         $0xBEEF0002,%r15
     int         $3
 
 ////////////////////////////////////////////////////////////////////////////////////

@@ -53,6 +53,7 @@ mainkernelthread:
 //mov 8(%rdi),%rcx
 //int $3
 
+    call    init_memory_pools
     call    createTextConsole
 
 
