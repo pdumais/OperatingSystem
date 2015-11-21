@@ -200,6 +200,7 @@ void connect(socket *s, uint32_t ip, uint16_t port)
 
 void listen(socket*s, uint32_t source, uint16_t port, uint16_t backlog)
 {
+    //TODO: make sure that the source port is not in use by something else
     memclear64(s->backlog,sizeof(socket_info)*backlog);
     s->backlogSize = backlog;
     s->destinationIP = 0;

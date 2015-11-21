@@ -50,7 +50,9 @@ int main(uint64_t param)
     while (!s2)
     {
         s2 = accept(s);
+        if (poll_in()==0x0A) return;
     }
+
     printf("Accepted\r\n");
     while (!isconnected(s2));
     printf("connected\r\n");

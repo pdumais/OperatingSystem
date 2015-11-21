@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "console.h"
 #include "../memorymap.h"
+#include "memorypool.h"
 
 #define MAX_CONSOLES 128
 
@@ -10,20 +11,19 @@ extern void* userAllocPages(uint64_t pageCount);
 extern uint64_t getPTEntry(uint64_t virtual_address);
 extern void memcpy64(char* source, char* dest, uint64_t size);
 extern void memclear64(char* dest, uint64_t size);
-extern void* currentProcessVirt2phys(void* address);
 extern void mutexLock(uint64_t*);
 extern void mutexUnlock(uint64_t*);
 extern void rwlockWriteLock(uint64_t*);
 extern void rwlockWriteUnlock(uint64_t*);
 extern void rwlockReadLock(uint64_t*);
 extern void rwlockReadUnlock(uint64_t*);
-extern void* malloc(uint64_t size);
 
 volatile uint64_t frontLineSwitchLock;
 volatile uint64_t frontLineConsoleIndex;
 volatile uint64_t requestedConsoleIndex;
 struct ConsoleData* consoles[MAX_CONSOLES];  
 uint64_t consoleListLock;
+uint64_t memoryPool;
 
 //
 // When a thread is dead, it wont attempt to access its console's screen
@@ -299,6 +299,7 @@ void initConsoles()
     requestedConsoleIndex = -1;
     frontLineSwitchLock = 0;
     consoleListLock = 0;
+    memoryPool = create_memory_pool(sizeof(struct ConsoleData));
     for (i=0;i<MAX_CONSOLES;i++) consoles[i] = 0;
     enableCursor(false);
 }
@@ -342,6 +343,7 @@ void destroy_text_console_handle(system_handle* handle)
 {
     struct ConsoleData* h = (struct ConsoleData*)handle;
     restoreTextConsole(h->previousOwningProcess); 
+    release_object(memoryPool,h);
 }
 
 struct ConsoleData* createTextConsoleForProcess()
@@ -349,7 +351,8 @@ struct ConsoleData* createTextConsoleForProcess()
     struct ConsoleData** consoleDataPointer;
     consoleDataPointer = (struct ConsoleData**)CONSOLE_POINTER;
 
-    struct ConsoleData* consoleInfo = (struct ConsoleData*)malloc(sizeof(struct ConsoleData));
+    //struct ConsoleData* consoleInfo = (struct ConsoleData*)malloc(sizeof(struct ConsoleData));
+    struct ConsoleData* consoleInfo = (struct ConsoleData*)reserve_object(memoryPool);
     *consoleDataPointer = consoleInfo;
 
     memclear64(consoleInfo,sizeof(struct ConsoleData));
@@ -443,11 +446,12 @@ uint64_t stealTextConsole(uint64_t processID)
         if (consoles[i]->owningProcess == processID)
         {
             struct ConsoleData* oldEntry = consoles[i];
-            consoles[i] = (struct ConsoleData*)currentProcessVirt2phys((void*)entry);
+            consoles[i] = entry;
             memcpy64(oldEntry->backBuffer,consoles[i]->backBuffer,(2*80*25));
             consoles[i]->backBufferPointer = oldEntry->backBufferPointer;
             consoles[i]->previousOwningProcess = oldEntry;
             mutexUnlock(&consoleListLock);
+pf("Console: %x\r\n",entry); //TODO: remove that. debug purposes only
             return (uint64_t)oldEntry;
         }
     }
@@ -466,7 +470,7 @@ void createTextConsole()
     {
         if (consoles[i] == 0)
         {
-            consoles[i] = (struct ConsoleData*)currentProcessVirt2phys((void*)entry);
+            consoles[i] = entry;
             //__asm("mov %0,%%rax; int $3" : : "r"(consoles[i]));
             break;
         }
@@ -480,10 +484,11 @@ void removeConsole()
     struct ConsoleData* entry = *((struct ConsoleData**)CONSOLE_POINTER);
     for (i=0;i<MAX_CONSOLES;i++)
     {
-        if (consoles[i] == (struct ConsoleData*)currentProcessVirt2phys((void*)entry))
+        if (consoles[i] == entry)
         {
             system_handle* h = (system_handle*)consoles[i];
             h->destructor(h);
+            *((struct ConsoleData**)CONSOLE_POINTER) = 0;
             return;
         }
     }

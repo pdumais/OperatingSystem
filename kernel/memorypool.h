@@ -3,9 +3,9 @@
 
 struct _memory_pool_node
 {
-    struct _memory_pool_node* next;
+    struct _memory_pool_node *next;
     char flags;
-    char data[];
+    char reserved[7];   // this is to pack struct to 16bytes
 } __attribute__((__packed__)); 
 
 typedef struct _memory_pool_node memory_pool_node;

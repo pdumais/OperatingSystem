@@ -28,9 +28,13 @@ uint64_t create_memory_pool(uint64_t objSize)
         {
             pools[i].first = 0;
             memory_pool_expand(i);  // Allocate at least one page for the pool
+//__asm("int $3" : : "a"(i),"b"(pools[i].node_size),"c"(0xDEADBEEF),"d"(pools[i].first));
             return i;
         }
     }
+
+    __asm("int $3");
+    return 0;
 }
 
 // This function will guarantee that each node reside on consecutive 
@@ -78,7 +82,7 @@ memory_pool_node* memory_pool_expand(uint64_t pool)
     memory_pool_node* n = pools[pool].first;
     if (n==0)
     {
-        pools[pool].first = n;
+        pools[pool].first = new_nodes;
     }
     else
     {
@@ -93,8 +97,8 @@ memory_pool_node* memory_pool_expand(uint64_t pool)
 
 void* reserve_object(uint64_t pool)
 {
-    if (pool >= MAX_MEMORY_POOLS) return;
-    if (pools[pool].node_size == 0) return;
+    if (pool >= MAX_MEMORY_POOLS) return 0;
+    if (pools[pool].node_size == 0) return 0;
 
     // The pool is guaranteed to contain at least 1 node.
     // might not be free though. There is no need to lock
@@ -109,9 +113,10 @@ void* reserve_object(uint64_t pool)
         {
             // We just need to be protected against other threads trying to reserve
             // the same slot at the same time.
-            if (!atomic_set(&(node->flags),0))
+            if (!atomic_set(&node->flags,0))
             {
-                return &node->data;
+                uint64_t addr = ((uint64_t)node)+sizeof(memory_pool_node);
+                return (void*)addr;
             }
             node = node->next;
         }
@@ -124,11 +129,14 @@ void* reserve_object(uint64_t pool)
         //      possibly creating an unnecessary expansion.
         if (memory_pool_expand(pool) == 0) return 0;
     }
+
+    return 0;
 }
 
 void release_object(uint64_t pool, void* obj)
 {
-    memory_pool_node* node = (obj-sizeof(memory_pool_node));
+    uint64_t addr = ((uint64_t)obj)-sizeof(memory_pool_node);
+    memory_pool_node* node = (memory_pool_node*)addr;
     //TODO: we should shrink the pool if last objects are free
     node->flags &= 0b11111110;
 }

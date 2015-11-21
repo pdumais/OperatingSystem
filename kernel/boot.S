@@ -188,7 +188,6 @@ longmodeAP:
 
 .align 16
 longmode:
-    call    initConsoles
     call    prepareGDTAndTSS
     call    setupIDT
     call    loadIDT
@@ -199,6 +198,8 @@ longmode:
     call    initAPICTimer
 
     call    initHardware
+    call    init_memory_pools
+    call    initConsoles
     call    startKernelThread
 
     movq    $0,WAITFORBST

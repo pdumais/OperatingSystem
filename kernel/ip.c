@@ -5,6 +5,7 @@
 #include "ip.h"
 
 #define MAX_IP_PAYLOAD_SIZE 1480
+#define MAX_PACKET_COUNT 32
 
 extern unsigned long ip_routing_route(unsigned int destinationIP, unsigned char* interface);
 extern struct NetworkConfig* net_getConfig(unsigned char index);
@@ -43,6 +44,7 @@ struct IPHeader
 }__attribute__((packed));
 
 
+
 /*
  Using 64k slots is not very efficient since we wont' get a lot of packets
 of that size so it will be wastefull. But I will keep it this way for now
@@ -50,6 +52,7 @@ for simplicity's sake. If using slots the same size as the expected packet
 size (as indicated in the IP header), this will introduce a concept
 of memory fragmentation everytime we will free up a slot.
 */
+//TODO: these should be in memory pool instead
 struct PacketBufferSlot
 {
     unsigned int ip;
@@ -61,17 +64,17 @@ struct PacketBufferSlot
 }__attribute__((packed));
 
 unsigned short ipID=0;
-char* packetBuffer=0;
+struct PacketBufferSlot* packetBuffers;
 
 
 void ip_init()
 {
     unsigned long i;
-    packetBuffer = kernelAllocPages(512);
+    packetBuffers = kernelAllocPages((MAX_PACKET_COUNT*sizeof(struct PacketBufferSlot)/4096));
 
-    for (i=0;i<32;i++)
+    for (i=0;i<MAX_PACKET_COUNT;i++)
     {
-        ((struct PacketBufferSlot*)&packetBuffer[i*0x10000])->ip = 0;
+        packetBuffers[i].ip = 0;
     }    
 
 }
@@ -88,7 +91,7 @@ struct PacketBufferSlot* getPacketBufferSlot(unsigned int ip, unsigned short id)
     unsigned int i;
     for (i=0;i<32;i++)
     {
-        struct PacketBufferSlot* slot = (struct PacketBufferSlot*)&packetBuffer[i*0x10000];
+        struct PacketBufferSlot* slot = &packetBuffers[i];
         if (slot->ip == 0) freeSlot = slot;
         if (slot->ip == ip && slot->id == id)
         {
@@ -190,13 +193,14 @@ void ip_process(struct Layer2Payload* payload)
     {
         return;
     }
+
     unsigned int source = header->source;
     unsigned short id = header->id;
 
     struct PacketBufferSlot* slot = getPacketBufferSlot(source,id);
     if (slot == 0)
     {
-        while(1);//TODO: this is for debug purposes
+        __asm("int $3");
     }
     if (slot->ip == 0)
     {
@@ -211,6 +215,7 @@ void ip_process(struct Layer2Payload* payload)
     }
     
     slot->receivedSize += size;
+
     memcpy64((char*)&payload->data[dataOffset],(char*)&slot->payload[offset<<3],size);
     if (slot->receivedSize == slot->expectedSize)
     {
@@ -234,7 +239,6 @@ void ip_process(struct Layer2Payload* payload)
 
         // free slot back again
         slot->ip = 0;
-        memclear64((char*)&slot->payload[12],0xFFF0);
     }
 
 }
