@@ -4,18 +4,18 @@
 struct _memory_pool_node
 {
     struct _memory_pool_node* next;
-    
+    char flags;
     char data[];
-}; 
+} __attribute__((__packed__)); 
 
 typedef struct _memory_pool_node memory_pool_node;
 
 typedef struct
 {
     memory_pool_node* first;
-    memory_pool_node* last;
     uint64_t          node_size;
-} memory_pool;
+    uint64_t          lock;
+} __attribute__((__packed__)) memory_pool;
 
 
 void init_memory_pools();

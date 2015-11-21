@@ -1,14 +1,8 @@
 - socket, console and file_handle should not be created with malloc
-    This is pretty much what kernelAllocPages does. But we don't want to reserve 
-    whole pages. So we should build a memory pool
-        - in order to not have to reserve several pages at once,
-          each object should be in a linked list. The whole node(pointers and object)
-          must be guaranteed to reside on consecutive mem. 
-            - when creating the pool, convert the object size to pageCount
-            - when creating a new node, reserve pageCount pages.
-            - should pack several if they fit in same page
-            - not mapped in any virtual space. Only accessible from mirror area
-            - returns physical address
+    memory pool: finish TODO in memorypool.c
+    replace console objects creation
+    replace file_handle creation
+    replace socket creation
 
 - application
     - web server: serve files from ata disk
