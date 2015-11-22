@@ -48,6 +48,7 @@ void streamCharacters(char* str)
     if (cd == 0) return;
     while (*str!=0)
     {
+if (((uint64_t)cd->flush_function)<100) __asm("int $3" : : "a"(cd->flush_function), "b"(cd));
         char c = *str;
         if (cd->streamPointer>=512)
         {
@@ -300,6 +301,7 @@ void initConsoles()
     frontLineSwitchLock = 0;
     consoleListLock = 0;
     memoryPool = create_memory_pool(sizeof(struct ConsoleData));
+
     for (i=0;i<MAX_CONSOLES;i++) consoles[i] = 0;
     enableCursor(false);
 }

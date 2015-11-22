@@ -1,5 +1,5 @@
 #include "memorypool.h"
-extern void memclear64(char* destination, uint64_t size);
+extern void memclear64(void* destination, uint64_t size);
 extern void spinLock(uint64_t*);
 extern void spinUnlock(uint64_t*);
 extern bool atomic_set(void* var, uint8_t bit);
@@ -15,7 +15,7 @@ memory_pool pools[MAX_MEMORY_POOLS];
 
 void init_memory_pools()
 {
-    memclear64(pools,sizeof(memory_pool)*MAX_MEMORY_POOLS);
+    memclear64((void*)pools,sizeof(memory_pool)*MAX_MEMORY_POOLS);
 }
 
 uint64_t create_memory_pool(uint64_t objSize)
@@ -54,23 +54,25 @@ memory_pool_node* memory_pool_expand(uint64_t pool)
     // but if the object is smaller, then we can fit several in one page.
     if (node_size >2048)
     {
-        uint64_t page_count = (node_size+0xFFF)&0xFFF;
-        new_nodes = (memory_pool_node*)kernelAllocPages(page_count);        
-        memclear64(new_nodes,page_count*4096);
+        uint64_t page_count = (node_size+0xFFF) >> 12;
+        new_nodes = (memory_pool_node*)kernelAllocPages(page_count);         
+        memclear64((void*)new_nodes,page_count*4096);
         // This new node will start at begining of page and we will only have 1 node
     }
     else
     {
         uint64_t object_count = 4096/node_size;
         new_nodes = (memory_pool_node*)kernelAllocPages(1);        
-        memclear64(new_nodes,4096);
+        memclear64((void*)new_nodes,4096);
         memory_pool_node* n = new_nodes;
-
+//__asm("int $3" : : "a"(object_count),"b"(node_size));
         // several nodes will exist in that page. Set the "next" pointer to 
         // the folldwing node. Leave the last one to 0
+        uint64_t addr = (uint64_t)new_nodes;
         for (i = 0; i < object_count-1;i++)
         {
-            n->next = (n+node_size);
+            addr += node_size;
+            n->next = (memory_pool_node*)addr;
             n = n->next;
         }
     }

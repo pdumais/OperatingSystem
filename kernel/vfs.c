@@ -1,14 +1,22 @@
 #include "vfs.h"
 #include "flatfs.h"
 #include "../memorymap.h"
+#include "memorypool.h"
 
 extern void* currentProcessVirt2phys(void* address);
 void add_file_handle_to_list(file_handle* f);
 void remove_file_handle_from_list(file_handle* f);
+uint64_t memoryPool;
+
+void init_vfs()
+{
+    memoryPool = create_memory_pool(sizeof(file_handle));
+}
 
 file_handle* fopen(char* name, uint64_t access_type)
 {
     file_handle* f = (file_handle*)malloc(sizeof(file_handle));    
+    //file_handle* f = reserve_object(memoryPool);
 
     f->operations.fopen = &flatfs_fopen;
     f->operations.fread = &flatfs_fread;
@@ -19,7 +27,8 @@ file_handle* fopen(char* name, uint64_t access_type)
 
     if (!f->operations.fopen(f,name,access_type))
     {
-        free((void*)f);
+        free(f);
+      //  release_object(memoryPool,f);
         return 0;
     }
 
@@ -80,7 +89,8 @@ void fclose(file_handle* f)
 {
     f->operations.fclose((system_handle*)f);
     remove_file_handle_from_list(f);
-    free((void*)f);
+    free(f);
+    //release_object(memoryPool,f);
 }
 
 void fseek(file_handle* f, uint64_t count, bool absolute)

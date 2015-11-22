@@ -208,8 +208,9 @@ atomic_set:
 /////////////////////////////////////////////////////////////////////////////////////
 atomic_cmpxchg:
     mov         %rdx,%rax
+    xor         %rdx,%rdx
     lock cmpxchgq %rsi,(%rdi)
-    xor         %rax,%rax
-    setz        %al
+    setz        %dl
+    mov         %rdx,%rax
     ret
 

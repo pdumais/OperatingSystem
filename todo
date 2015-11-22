@@ -1,15 +1,10 @@
 - Memory Pool
-    - replace file_handle creation
-        test with fclose and test when not closing file (so destructor kicks in)
-        - to test, just launch "date", it will use a file handle
     - replace socket creation
     - memory pool: finish TODO in memorypool.c (mainly for freeing objects)
 
-- Heap corruption
-    after launching a telnet process and accessing it,
-    I get heap corruptions from time to time.
-    I could not find a pattern but it seemed to appear after
-    launching telnet a couple of times in a row.
+
+
+
 
 - application
     - web server: serve files from ata disk
