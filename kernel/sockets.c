@@ -132,7 +132,7 @@ int send_tcp_message(socket* s, uint8_t control, char* payload, uint16_t size)
 
 socket* create_socket()
 {
-    socket* s = (socket*)malloc(sizeof(socket));
+    socket* s = (socket*)reserve_object(socket_pool);
     memclear64(s,sizeof(socket));
 
     s->handle.destructor = &socket_destructor;
@@ -165,7 +165,7 @@ void delete_socket(socket* s)
     {
         //TODO: should delete all those connections?
     }
-    free((void*)s);
+    release_object(s);
 }
 
 void release_socket(socket* s)
@@ -227,7 +227,7 @@ socket* accept(socket*s)
     {
         if (s->backlog[i].tcp.state == SOCKET_STATE_CONNECTING)
         {
-            socket* s2 = (socket*)malloc(sizeof(socket));
+            socket* s2 = (socket*)reserve_object(socket_pool);
             memclear64(s2,sizeof(socket));
             s2->handle.destructor = &socket_destructor;
 

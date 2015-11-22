@@ -1,10 +1,5 @@
 - Memory Pool
-    - replace socket creation
     - memory pool: finish TODO in memorypool.c (mainly for freeing objects)
-
-
-
-
 
 - application
     - web server: serve files from ata disk
