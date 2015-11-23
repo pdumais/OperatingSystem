@@ -28,11 +28,9 @@ uint64_t create_memory_pool(uint64_t objSize)
         {
             pools[i].first = 0;
             memory_pool_expand(i);  // Allocate at least one page for the pool
-//__asm("int $3" : : "a"(i),"b"(pools[i].node_size),"c"(0xDEADBEEF),"d"(pools[i].first));
             return i;
         }
     }
-
     __asm("int $3");
     return 0;
 }
@@ -56,6 +54,7 @@ memory_pool_node* memory_pool_expand(uint64_t pool)
     {
         uint64_t page_count = (node_size+0xFFF) >> 12;
         new_nodes = (memory_pool_node*)kernelAllocPages(page_count);         
+        if (new_nodes == 0) return 0;
         memclear64((void*)new_nodes,page_count*4096);
         // This new node will start at begining of page and we will only have 1 node
     }
@@ -63,9 +62,10 @@ memory_pool_node* memory_pool_expand(uint64_t pool)
     {
         uint64_t object_count = 4096/node_size;
         new_nodes = (memory_pool_node*)kernelAllocPages(1);        
+        if (new_nodes == 0) return 0;
         memclear64((void*)new_nodes,4096);
         memory_pool_node* n = new_nodes;
-//__asm("int $3" : : "a"(object_count),"b"(node_size));
+
         // several nodes will exist in that page. Set the "next" pointer to 
         // the folldwing node. Leave the last one to 0
         uint64_t addr = (uint64_t)new_nodes;
@@ -93,7 +93,6 @@ memory_pool_node* memory_pool_expand(uint64_t pool)
     }
     spinUnlock(&(pools[pool].lock));
 
-    //TODO: we should return 0 if expansion failed
     return new_nodes;
 }
 
