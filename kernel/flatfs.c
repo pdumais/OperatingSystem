@@ -10,20 +10,20 @@ bool flatfs_fopen(system_handle* h, char* name, uint64_t access_type)
     file_handle* f = (file_handle*)h;
     h->destructor = &flatfs_system_handle_destructor;
 
-    char index[512];
+    char index[5120];
     n1 = name[0];
     n2 = name[1];
     device = ((n1-0x30)<<4) || (n2-0x30);
     name += 4; // skip the xx:/ part of path
     
-    block_cache_read(0,device,index,1);
+    block_cache_read(0,device,index,10);
   
     f->position = 0;
     f->start = -1;
     f->size = 0;
     f->device = device;
     char* lbuf = (uint64_t*)&index[0];
-    for (i = 0; i < 10; i++)       // index can't contain more than 10 entries    
+    for (i = 0; i < 100; i++)       // index can't contain more than 100 entries    
     {
         for (n=0;n<32;n++)
         {

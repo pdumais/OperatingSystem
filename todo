@@ -1,6 +1,5 @@
 - application
     - web server: serve files from ata disk
-        - index should supportn10 sectors for more files
         - make a folder of files that will be copied
     - telnet client application
 
