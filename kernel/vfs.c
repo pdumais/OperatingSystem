@@ -15,8 +15,8 @@ void init_vfs()
 
 file_handle* fopen(char* name, uint64_t access_type)
 {
-    file_handle* f = (file_handle*)malloc(sizeof(file_handle));    
-    //file_handle* f = reserve_object(memoryPool);
+    //file_handle* f = (file_handle*)malloc(sizeof(file_handle));    
+    file_handle* f = reserve_object(memoryPool);
 
     f->operations.fopen = &flatfs_fopen;
     f->operations.fread = &flatfs_fread;
@@ -25,10 +25,11 @@ file_handle* fopen(char* name, uint64_t access_type)
     f->operations.fclose = &flatfs_fclose;
     f->operations.fgetsize = &flatfs_fgetsize;
 
+    if (f->operations.fopen == 0) __asm("int $3");
     if (!f->operations.fopen(f,name,access_type))
     {
-        free(f);
-      //  release_object(memoryPool,f);
+      //  free(f);
+        release_object(memoryPool,f);
         return 0;
     }
 
@@ -77,6 +78,7 @@ void remove_file_handle_from_list(file_handle* f)
 
 uint64_t fread(file_handle* f, uint64_t count, char* destination)
 {
+    if (f->operations.fread == 0) __asm("int $3");
     return f->operations.fread((system_handle*)f,count,destination);
 }
 
@@ -87,10 +89,11 @@ uint64_t fwrite(file_handle* f, uint64_t count, char* destination)
 
 void fclose(file_handle* f)
 {
+    if (f->operations.fclose == 0) __asm("int $3");
     f->operations.fclose((system_handle*)f);
     remove_file_handle_from_list(f);
-    free(f);
-    //release_object(memoryPool,f);
+    //free(f);
+    release_object(memoryPool,f);
 }
 
 void fseek(file_handle* f, uint64_t count, bool absolute)
@@ -112,10 +115,10 @@ void destroyFileHandles()
     file_handle* f = *((file_handle**)FILE_HANDLE_ADDRESS);    
     while (f != 0)
     {
-        system_handle* h = (system_handle*)f;
-        h->destructor(h);
-        f = f->next;
         pf("destroying improperly closed file handle\r\n");
+        system_handle* h = (system_handle*)f;
+        f = f->next;
+        h->destructor(h);
     }   
     *((file_handle**)FILE_HANDLE_ADDRESS) = 0;    
 }

@@ -97,7 +97,6 @@ int send_tcp_message(socket* s, uint8_t control, char* payload, uint16_t size)
     // Doing a copy here will slow down things. We should pass down header
     // and payload. But then again, eventually, we should buffer those segments
     // to allow tcp retransmission. 
-    //TODO: should use memory pool instead of malloc
     tcp_segment* segment = (tcp_segment*)malloc(sizeof(tcp_segment));
 
     if (segment == 0)
@@ -165,7 +164,7 @@ void delete_socket(socket* s)
     {
         //TODO: should delete all those connections?
     }
-    release_object(s);
+    release_object(socket_pool,s);
 }
 
 void release_socket(socket* s)
@@ -200,6 +199,7 @@ void connect(socket *s, uint32_t ip, uint16_t port)
 
 void listen(socket*s, uint32_t source, uint16_t port, uint16_t backlog)
 {
+    //TODO: should accept 0.0.0.0 as source interface
     //TODO: make sure that the source port is not in use by something else
     memclear64(s->backlog,sizeof(socket_info)*backlog);
     s->backlogSize = backlog;

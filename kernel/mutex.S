@@ -46,7 +46,7 @@ spinLock:
     mov         $1,%rax
     lock xadd   %eax,(%rdi)
 1:  cmp         %eax,4(%rdi)
-    jne         1f
+    jne         1b
     pop         %rax
     ret
 
@@ -68,14 +68,14 @@ spinUnlock:       // rdi = spinlock address
 //          be able to release the lock without being preempted
 spinLock_softirq:                                                                             
     push        %rax   
-    pushf
+    pushfq
     pop         %rax
     mov         %rax,8(%rdi)
     cli                                                               
     mov         $1,%rax                                                               
     lock xadd   %eax,(%rdi)                                                           
 1:  cmp         %eax,4(%rdi)                                                          
-    jne         1f                                                                    
+    jne         1b                                                                    
     pop         %rax                                                                  
     ret                                                                               
                                                                                       

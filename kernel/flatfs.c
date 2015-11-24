@@ -50,6 +50,8 @@ uint64_t flatfs_fread(system_handle* h, uint64_t count, char* destination)
     char buf[512];
     file_handle* f = (file_handle*)h;
 
+    if ((f->position + count) > f->size) count = (f->size-f->position); 
+
     uint64_t first_sector = f->start + (f->position>>9);
     uint64_t start_index= f->position&0x1ff;
     uint64_t bytes_read = 0;
@@ -74,20 +76,21 @@ uint64_t flatfs_fread(system_handle* h, uint64_t count, char* destination)
         f->position += bytes_read;
     }
 
-//pf("woof %x  %x  %x\r\n",first_sector,count,bytes_read);
-//while (1);
     if (count!=bytes_read)
     {
         if (((count-bytes_read)<512))
         {
             block_cache_read(first_sector,f->device,buf,1);
             memcpy64(buf,destination,count-bytes_read);
+            bytes_read = count;
         }
         else
         {
             __asm("mov $0xDEADBEEF,%rax; int $3");
         }
     }
+
+    return bytes_read;
 }
 uint64_t flatfs_fwrite(system_handle* h, uint64_t count, char* destination)
 {

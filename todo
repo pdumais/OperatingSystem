@@ -1,7 +1,8 @@
-- application
-    - web server: serve files from ata disk
-        - make a folder of files that will be copied
-    - telnet client application
+- web server:
+    make a sprintf
+    send header
+
+- telnet client application
 
 - hexdump app: should be able to pass filename through command-line params
     - should get pushed on stack?
@@ -36,6 +37,7 @@
 - disk should be partitioned with MBR
     bootloader in MBR and kernerl in partition 1   
 - virtualization (nested virtualization??)
-
+    - vmx
+        - load vmcs with long mode data. boot a vm in long mide
 ======================================================================================
 

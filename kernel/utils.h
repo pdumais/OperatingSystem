@@ -1,4 +1,5 @@
 #pragma once
+#include "includes/kernel/types.h"
 
 #ifndef UNIT_TEST
 
@@ -33,6 +34,6 @@
 
 typedef struct
 {
-    unsigned long part1;
-    unsigned long part2;
+    uint64_t part1;
+    uint64_t part2;
 } spinlock_softirq_lock;
