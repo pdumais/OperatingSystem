@@ -1,9 +1,6 @@
-- web server:
-    make a sprintf
-    send header
+- unable to do 2 send in a row. merge together for now?
 
 - telnet client application
-
 - hexdump app: should be able to pass filename through command-line params
     - should get pushed on stack?
     - or just the pointer to string passed? but that new process

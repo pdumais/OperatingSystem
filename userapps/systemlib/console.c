@@ -45,19 +45,9 @@ unsigned long itoa(unsigned int v, char* outbuf)
     return digits;
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-// WARNING: no protection. Resulting string must not go over 1024 bytes
-// This file must be compiled with no SSE support otherwise it compiles a whole bunch
-// of xmm transfers with will result in device not ready exception at every context
-// switch.
-/////////////////////////////////////////////////////////////////////////////////////////
-void printf(char* fmt, ...)
+void format(char* st, char* fmt, va_list list, unsigned int max)
 {
-    va_list list;
-    va_start(list,fmt);
-
     int stIndex = 0;
-    char st[MAX_PRINTF_STR];
     while (*fmt!=0)
     {
         if (*fmt!='%')
@@ -113,11 +103,34 @@ void printf(char* fmt, ...)
             }
         }
         fmt++;
-        if (stIndex>=(MAX_PRINTF_STR-1)) break;
+        if (stIndex>=(max-1)) break;
     }
     st[stIndex] = 0;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// WARNING: no protection. Resulting string must not go over 1024 bytes
+// This file must be compiled with no SSE support otherwise it compiles a whole bunch
+// of xmm transfers with will result in device not ready exception at every context
+// switch.
+/////////////////////////////////////////////////////////////////////////////////////////
+void printf(char* fmt, ...)
+{
+    va_list list;
+    va_start(list,fmt);
+
+    char st[MAX_PRINTF_STR];
+    format(st,fmt,list, MAX_PRINTF_STR);
 
     __asm("int $0xA0" : : "D"(st), "a"(INTA0_PRINTF));
+    va_end(list);
+}
+
+void sprintf(char* dst, unsigned int max, char* str,...)
+{
+    va_list list;
+    va_start(list,str);
+    format(dst,str,list, max);
     va_end(list);
 }
 

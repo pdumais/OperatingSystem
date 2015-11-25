@@ -32,3 +32,10 @@ void strcpy(char* src, char* dst)
     }
     *dst = 0;
 }
+
+size_t strlen(char* src)
+{
+    size_t i=0;
+    while (src[i] != 0) i++;
+    return i;
+}
