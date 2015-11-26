@@ -18,7 +18,7 @@ extern void free(void* buffer);
 // This implementation is far from being up to specs. 
 // These sockets SHOULD NOT be used accross 2 user threads, which is a reasonable limitation.
 //
-//TODO: we should use memory pool to create temporary buffer in send_tcp_message
+//TODO: we should put a tmp buffer is socket and use it instead of malloc() in tcp_send
 //TODO: if netcard buffer overflow, send() will return the number of bytes sent and the user
 //      will have to send the rest. But that won't work because the tcp header was already sent
 //      out so the checksum is built on the full payload. Also, the last packet sent had the
@@ -50,6 +50,7 @@ extern void free(void* buffer);
 //        on other egress segments when they can
 //    No effort is made to put ingress segments in order using the 
 //        sequence number
+//    No flow control/window checking
 //
 // Closing a socket:
 //    A user application must call close_socket(). That will initiate the FIN sequence and ultimately

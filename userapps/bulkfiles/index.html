@@ -2,5 +2,22 @@
 <body>
 Oh yeah! This web page is served by my awesome web server
 running on my awesome OS. All home-brewed bro!
+<br/>
+Do you have any idea how many operations that involved?
+A webserver application needed to open up a socket in listening mode and
+read files from disk and serve it to you. That involved:
+<ul>
+<li>A virtual memory subsystem was implemented to support paging with 4k pages
+<li>A stack and heap mechanism was developed.
+<li>A scheduler was implemented and then a process launching system.
+<li>A network card driver
+<li>An interrupt management and IRQ (usign APIC) was needed
+<li>Then a TCP/IP stack was created
+<li>A ATA disk driver
+<li>A block cache to cache any blocks read from disk (or written to).
+<li>A system call mechanism to allow RING3 applications to requests OS calls.
+</ul>
+So you might not be impressed by this crappy web page, but it involved a shitload
+of assembly and C code. There is no STL or libc in here.
 </body>
 </html>

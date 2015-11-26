@@ -138,7 +138,6 @@ void release_object(uint64_t pool, void* obj)
 {
     uint64_t addr = ((uint64_t)obj)-sizeof(memory_pool_node);
     memory_pool_node* node = (memory_pool_node*)addr;
-    //TODO: we should shrink the pool if last objects are free
     node->flags &= 0b11111110;
 }
 
@@ -153,7 +152,41 @@ void destroy_memory_pool(uint64_t pool)
     if (pool >= MAX_MEMORY_POOLS) return;
 
     //TODO: release all pages for all nodes
+    //      There could be several nodes on ones page
+    //      or node that spans across several pages
 
     //No need to lock here    
     pools[pool].node_size = 0;
+}
+
+void memory_pool_free_pages(uint64_t pool)
+{
+    //TODO: lock 
+    //      This function would compete with other access to the list
+    //      such as when we reserve a block or release a block.
+    //      also when we destroy the pool.
+    //      Also: make sure pool was not destroyed by the time we got in here
+    memory_pool_node* node = pools[pool].first;
+    while (node != 0)
+    {
+        if ((node->flags&1)==0)
+        {
+            //TODO: release pages for that node. 
+            //      There could be several nodes on ones page
+            //      or node that spans across several pages
+        }
+        node = node->next;
+    }
+}    
+
+
+// TODO: this function should be called when mem goes low
+void memory_pool_reclaim()
+{
+    uint64_t i;
+    for (i=0;i< MAX_MEMORY_POOLS;i++)
+    {
+        if (pools[i].node_size == 0) continue;
+        memory_pool_free_pages(i);    
+    }
 }

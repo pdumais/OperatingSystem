@@ -17,7 +17,7 @@ typedef struct
     uint64_t          lock;
 } __attribute__((__packed__)) memory_pool;
 
-
+void memory_pool_reclaim();
 void init_memory_pools();
 uint64_t create_memory_pool(uint64_t objSize);
 void* reserve_object(uint64_t pool);
