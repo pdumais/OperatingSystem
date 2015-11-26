@@ -2,6 +2,7 @@
 #include "../memorymap.h"
 #include "ip.h"
 #include "netcard.h"
+#include "memorypool.h"
 
 #define EPHEMERAL_START 32768
 #define EPHEMERAL_END 65535
@@ -9,7 +10,6 @@
 
 extern uint64_t atomic_increase_within_range(uint64_t* var,uint64_t start, uint64_t end);
 extern uint16_t tcp_checksum(unsigned char* buffer, uint64_t bufsize, uint32_t srcBE, uint32_t dstBE);
-extern void* currentProcessVirt2phys(void* address);
 extern void* malloc(uint64_t size);
 extern void free(void* buffer);
 
@@ -229,6 +229,7 @@ socket* accept(socket*s)
         if (s->backlog[i].tcp.state == SOCKET_STATE_CONNECTING)
         {
             socket* s2 = (socket*)reserve_object(socket_pool);
+pf("HEEEY! %x\r\n",s2);
             memclear64(s2,sizeof(socket));
             s2->handle.destructor = &socket_destructor;
 
@@ -273,13 +274,13 @@ void add_socket_in_list(socket* s)
     if (first==0)
     {
         s->previous = 0;
-        *((socket**)SOCKETSLIST) = (socket*)currentProcessVirt2phys(s);
+        *((socket**)SOCKETSLIST) = s;
     }
     else
     {
         while (first->next != 0) first = first->next;
 
-        first->next = (socket*)currentProcessVirt2phys(s);
+        first->next = s; 
         s->previous = first;
     }
 }
@@ -482,6 +483,7 @@ void tcp_process_syn(socket* s, char* payload, uint16_t size,
 {
     if (s->tcp.state == SOCKET_STATE_LISTENING)
     {
+
         // No need to lock backlog list because the softirq is the only producer.
         uint16_t slot;
         for (slot = 0; slot < s->backlogSize; slot++) if (s->backlog[slot].tcp.state == 0) break;
@@ -491,7 +493,6 @@ void tcp_process_syn(socket* s, char* payload, uint16_t size,
             return;    
         } 
 
-        //__asm("int $3");
         socket_info* s2 = &(s->backlog[slot]);
         s2->tcp.state = SOCKET_STATE_CONNECTING;    
         s2->sourceIP = s->sourceIP;
@@ -540,6 +541,8 @@ void tcp_process_ack(socket* s, char* payload, uint16_t size)
 
 void tcp_process_fin(socket* s, char* payload, uint16_t size)
 {
+    if (s->tcp.state == SOCKET_STATE_LISTENING) return; //bogus
+
     // If we are connected, then send ack and then send fin
     s->tcp.nextExpectedSeq++;
     if (s->tcp.state == SOCKET_STATE_CONNECTED)
@@ -561,10 +564,6 @@ void tcp_process_fin(socket* s, char* payload, uint16_t size)
         tcp_send_ack(s);
         s->tcp.state = SOCKET_STATE_CLOSED;
         return;
-    }
-    else if (s->tcp.state == SOCKET_STATE_LISTENING)
-    {
-        // bogus
     }
 
     s->tcp.state = SOCKET_STATE_RESET;

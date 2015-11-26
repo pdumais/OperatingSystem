@@ -3,7 +3,6 @@
 #include "../memorymap.h"
 #include "memorypool.h"
 
-extern void* currentProcessVirt2phys(void* address);
 void add_file_handle_to_list(file_handle* f);
 void remove_file_handle_from_list(file_handle* f);
 uint64_t memoryPool;
@@ -46,13 +45,13 @@ void add_file_handle_to_list(file_handle* f)
     f->next = 0;
     if (firstHandle == 0)
     {
-        *((file_handle**)FILE_HANDLE_ADDRESS) = (file_handle*)currentProcessVirt2phys((void*)f);
+        *((file_handle**)FILE_HANDLE_ADDRESS) = f; 
         f->previous = 0;
     }
     else
     {
         while (firstHandle->next != 0) firstHandle = firstHandle->next;
-        firstHandle->next = (file_handle*)currentProcessVirt2phys((void*)f);
+        firstHandle->next = f; 
         f->previous = firstHandle;
     }
 }

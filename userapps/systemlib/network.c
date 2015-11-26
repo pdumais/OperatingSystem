@@ -56,7 +56,7 @@ void listen(socket*s, uint32_t source, uint16_t port, uint16_t backlog)
     __asm("int $0xA0" : : "D"(s),"S"(source),"d"(port),"c"(backlog), "a"(INTA0_LISTEN));
 }
 
-socket* accept(socket*s)
+socket* accept(socket* s)
 {
     socket* ret;
     __asm("int $0xA0" :"=a"(ret) : "D"(s), "a"(INTA0_ACCEPT));

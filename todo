@@ -1,3 +1,5 @@
+- why can I still compile even if header is missing? function should not be found
+
 - telnet client application
 
 ------------ To do later -------------------------------
