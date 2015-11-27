@@ -3,7 +3,7 @@ OBJC=display.o pci.o rtl8139.o netcard.o arp.o arpcache.o ip.o icmp.o ip_routing
 SOURCEC=$(OBJC:.o=.c)
 OBJASM=boot.o kernelmain.o interrupts.o scheduler.o helpers.o mutex.o mmu.o hardware.o apic.o intA0.o heap.o cmos.o
 SOURCEASM=$(OBJASM:.o=.S)
-CFLAGS=-fno-zero-initialized-in-bss -Wno-pointer-to-int-cast -ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow
+CFLAGS=-fno-zero-initialized-in-bss -Wno-pointer-to-int-cast -ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -Wimplicit-function-declaration -Werror=implicit-function-declaration
 PFLAGS=-DPCID
 
 .c.o:

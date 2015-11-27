@@ -10,6 +10,7 @@ extern unsigned short pci_getIRQ(unsigned int dev);
 extern void pci_enableBusMastering(unsigned int dev);
 extern void registerIRQ(void* handler, unsigned long irq);
 extern void setSoftIRQ(unsigned long);
+extern unsigned short pci_getIOAPICIRQ(unsigned int dev);
 
 
 /*

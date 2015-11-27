@@ -3,7 +3,7 @@
 #include "ip.h"
 #include "netcard.h"
 #include "memorypool.h"
-
+#include "display.h"
 #define EPHEMERAL_START 32768
 #define EPHEMERAL_END 65535
 #define MEMORY_POOL_COUNT 100
@@ -12,7 +12,8 @@ extern uint64_t atomic_increase_within_range(uint64_t* var,uint64_t start, uint6
 extern uint16_t tcp_checksum(unsigned char* buffer, uint64_t bufsize, uint32_t srcBE, uint32_t dstBE);
 extern void* malloc(uint64_t size);
 extern void free(void* buffer);
-
+extern void memcpy64(char* source, char* destination, uint64_t size);
+extern void memclear64(char* destination, uint64_t size);
 
 // TCP protocol implementation
 // This implementation is far from being up to specs. 
@@ -66,7 +67,7 @@ void tcp_send_synack(socket* s);
 void tcp_send_rst(socket* s);
 void tcp_close(socket* s);
 
-volatile uint64_t ephemeralPort = EPHEMERAL_START;
+uint64_t ephemeralPort = EPHEMERAL_START;
 uint64_t socket_pool = -1;
 
 typedef struct
@@ -123,8 +124,8 @@ int send_tcp_message(socket* s, uint8_t control, char* payload, uint16_t size)
     segment->header.window = __builtin_bswap16(0x100);
     segment->header.checksum = 0;
 
-    segment->header.checksum = tcp_checksum(segment, segmentSize, __builtin_bswap32(s->sourceIP), __builtin_bswap32(s->destinationIP));
-    int ret = ip_send(sourceInterface, s->destinationIP, segment, segmentSize, 6);
+    segment->header.checksum = tcp_checksum((char*)segment, segmentSize, __builtin_bswap32(s->sourceIP), __builtin_bswap32(s->destinationIP));
+    int ret = ip_send(sourceInterface, s->destinationIP, (char*)segment, segmentSize, 6);
 
     free(segment);
     return (ret-sizeof(tcp_header));
@@ -229,7 +230,6 @@ socket* accept(socket*s)
         if (s->backlog[i].tcp.state == SOCKET_STATE_CONNECTING)
         {
             socket* s2 = (socket*)reserve_object(socket_pool);
-pf("HEEEY! %x\r\n",s2);
             memclear64(s2,sizeof(socket));
             s2->handle.destructor = &socket_destructor;
 

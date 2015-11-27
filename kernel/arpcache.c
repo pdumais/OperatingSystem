@@ -1,5 +1,5 @@
 #include "display.h"
-
+extern unsigned long getTicksSinceBoot();
 //TODO: we should also use a second level of cache for recently used addresses. this would reduce the chances of
 //      collisions if we happen to be using 5 addresses that collision together (the collision depth is 4 here)
 //WARNING: entries in cache must be little-endian

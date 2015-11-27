@@ -22,6 +22,8 @@ extern uint64_t calculateMemoryUsage();
 extern void releasePhysicalPage(uint64_t physicalAddress);
 extern void init_heap(uint64_t physicalAddressOfHeap);
 
+void setUserProcessCodeSection(struct UserProcessInfo* upi, char* buffer, uint64_t virtualAddress, uint64_t size);
+
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 // This is for user threads. The code will be copied in another

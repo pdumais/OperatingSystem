@@ -18,6 +18,8 @@ extern void rwlockWriteUnlock(uint64_t*);
 extern void rwlockReadLock(uint64_t*);
 extern void rwlockReadUnlock(uint64_t*);
 
+void restoreTextConsole(struct ConsoleData* oldEntry);
+
 volatile uint64_t frontLineSwitchLock;
 volatile uint64_t frontLineConsoleIndex;
 volatile uint64_t requestedConsoleIndex;

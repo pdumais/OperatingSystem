@@ -1,5 +1,6 @@
 #include "utils.h"
 #include "../memorymap.h"
+#include "display.h"
 
 // WARNING
 //  we only support 48bitLBA (but we dont check for it)
@@ -9,6 +10,7 @@
 // It is not the responsibility of this driver to do so.
 
 extern void getInterruptInfoForBus(unsigned long bus, unsigned int* buffer);
+extern unsigned int pci_getBar(unsigned int dev,unsigned char bar);
 typedef void (*atairqcallback)(unsigned char, unsigned long, unsigned long);
 
 // Warning: we only support PATA now and we dont get registers from PCI

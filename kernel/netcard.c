@@ -1,3 +1,4 @@
+#include "ip.h"
 #include "netcard.h"
 #include "display.h"
 #include "utils.h"

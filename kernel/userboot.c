@@ -2,6 +2,7 @@
 #include "block_cache.h"
 #include "userprocess.h"
 #include "vfs.h"
+#include "display.h"
 
 // This MUST be a multiple of 4096
 //TODO: we should determine the count dynamically. This will be easy when using FAT32
@@ -11,6 +12,8 @@ extern void* kernelAllocPages(uint64_t count);
 extern void kernelReleasePages(uint64_t addr, uint64_t count);
 extern void showMem();
 extern void strcpy(char* src, char* dst);
+extern void* malloc(uint64_t size);
+extern void free(void*);
 
 uint64_t deviceContainingScript;
 uint64_t appParam = 0;

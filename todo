@@ -1,4 +1,9 @@
-- why can I still compile even if header is missing? function should not be found
+- fix errors with new compiler warnings
+    test:
+        multiple connections to web server
+        ping
+        hex editor
+        date
 
 - telnet client application
 

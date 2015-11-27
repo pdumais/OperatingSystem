@@ -2,6 +2,7 @@
 #include "flatfs.h"
 #include "../memorymap.h"
 #include "memorypool.h"
+#include "display.h"
 
 void add_file_handle_to_list(file_handle* f);
 void remove_file_handle_from_list(file_handle* f);

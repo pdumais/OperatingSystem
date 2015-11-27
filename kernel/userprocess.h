@@ -20,3 +20,4 @@ struct UserProcessInfo
 void createUserProcess(struct UserProcessInfo*);
 void addUserProcessSection(struct UserProcessInfo* upi, char* buffer, uint64_t virtualAddress, uint64_t size, bool readOnly, bool executable, bool initZero);
 void launchUserProcess(struct UserProcessInfo* upi);
+void createProcessHeap(struct UserProcessInfo* upi);

@@ -16,6 +16,7 @@ extern void icmp_process(char* buffer, unsigned short size, unsigned int from, u
 extern char* kernelAllocPages();
 extern void memclear64(char* buf, unsigned long size);
 extern unsigned long net_send(unsigned char interface, unsigned long destinationMAC, unsigned short vlan, unsigned short ethertype, struct NetworkBuffer* netbuf);
+extern void memcpy64(char* source, char* destination, uint64_t size);
 
 /*
     When a frame comes in, we will try to find a slot in the buffer that has a matching

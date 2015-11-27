@@ -2,10 +2,12 @@
 #include "utils.h"
 #include "../memorymap.h"
 #include "includes/kernel/types.h"
+#include "display.h"
 // http://www.computer-engineering.org/ps2keyboard/scancodes1.html
 
 extern void getInterruptInfoForBus(unsigned long bus, unsigned int* buffer);
 extern void storeCharacter(uint16_t c);
+extern void registerIRQ(void* handler, unsigned long irq);
 
 unsigned char ctrlKey;
 unsigned char shiftKey;
