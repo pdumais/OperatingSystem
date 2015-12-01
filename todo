@@ -1,4 +1,3 @@
-- mempool locking
 ------------ To do later -------------------------------
 - networking
     - sockets still needs a lot of improvements (doc/net)
@@ -6,7 +5,7 @@
     - udp sockets
     - dns resolution for connect()
     - DHCP
-- mem pool: release phys mem when too many pages commited after a release
+- mem pool: invoke memory_pool_reclaim when running low on mem
 - hexdump app: should be able to pass filename through command-line params
     - should get pushed on stack?
     - or just the pointer to string passed? but that new process
