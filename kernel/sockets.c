@@ -14,6 +14,11 @@ extern void* malloc(uint64_t size);
 extern void free(void* buffer);
 extern void memcpy64(char* source, char* destination, uint64_t size);
 extern void memclear64(char* destination, uint64_t size);
+extern void rwlockWriteLock(uint64_t*);
+extern void rwlockWriteUnlock(uint64_t*);
+extern void rwlockReadLock(uint64_t*);
+extern void rwlockReadUnlock(uint64_t*);
+
 
 // TCP protocol implementation
 // This implementation is far from being up to specs. 
@@ -25,12 +30,6 @@ extern void memclear64(char* destination, uint64_t size);
 //      out so the checksum is built on the full payload. Also, the last packet sent had the
 //      "more fragments" bit set so the other end is expecting the last packet of the series 
 //      we can test this by simulating a netcard send failure
-//
-//TODO: sockets should locked on usage
-//          a socket might be used in softirq (on another CPU) while being used in a thread
-//          a socket might get deleted as part of process detruction while softIRQ is using it
-//          a socket might get deleted by a thread  while softIRQ is using it. So the socket list
-//            AND the socket itself should be locked
 //TODO: should use timer to detect if socket stays in a state for too long 
 //      for example: waiting for ack of fin
 //TODO: outbound messages should be added in a queue so that we can retransmit upon not receiving ACK
@@ -69,6 +68,7 @@ void tcp_close(socket* s);
 
 uint64_t ephemeralPort = EPHEMERAL_START;
 uint64_t socket_pool = -1;
+uint64_t socket_list_lock;
 
 typedef struct
 {
@@ -161,10 +161,20 @@ void close_socket(socket* s)
 
 void delete_socket(socket* s)
 {
+    // Since the linked-list is locked while we remove the socket from list and it
+    // is locked while we try to find a socket from list, we have a guarantee that
+    // if the socket is found in the list, while list-lock is locked, then 
+    // the socket is not deleted. The find_socket will lock the socket while 
+    // it is still holding the list-lock.
     remove_socket_from_list(s);
+
+    while (s->deletion_lock);
+    // At this point, we know the socket is not locked and it is not in the list
+    // so there is no chance that the softIRQ is still using it.
+
     if (s->backlog)
     {
-        //TODO: should delete all those connections?
+        //TODO: should reset all those connections?
     }
     release_object(socket_pool,s);
 }
@@ -267,7 +277,7 @@ void socket_destructor(system_handle* h)
 
 void add_socket_in_list(socket* s)
 {
-    //TODO: should lock: multiple cpu/threads will use this.
+    rwlockWriteLock(&socket_list_lock);
     socket* first = *((socket**)SOCKETSLIST);
 
     s->next = 0;
@@ -283,15 +293,16 @@ void add_socket_in_list(socket* s)
         first->next = s; 
         s->previous = first;
     }
+    rwlockWriteUnlock(&socket_list_lock);
 }
 
 
 void remove_socket_from_list(socket* s)
 {
+    rwlockWriteLock(&socket_list_lock);
     socket *previous = s->previous;
     socket *next = s->next;
 
-    //TODO: this should lock so that it would be multi-thread safe
     if (previous == 0)
     {
         *((socket**)SOCKETSLIST) = next;
@@ -302,13 +313,14 @@ void remove_socket_from_list(socket* s)
         previous->next = next;
         if (next!=0) next->previous = previous;
     }
+    rwlockWriteUnlock(&socket_list_lock);
 }
 
 void destroy_sockets(uint64_t pid)
 {
+    rwlockWriteLock(&socket_list_lock);
     socket* s = *((socket**)SOCKETSLIST);
 
-    //TODO: this should lock so that it would be multi-thread safe
     while (s)
     {
         socket* victim = s;
@@ -331,6 +343,7 @@ void destroy_sockets(uint64_t pid)
             }
         }
     }
+    rwlockWriteUnlock(&socket_list_lock);
 }
 
 int send(socket* s, char* buffer, uint16_t length)
@@ -376,6 +389,7 @@ int recv(socket* s, char* buffer, uint16_t max)
 // the socket itself.
 socket* find_socket(uint32_t sourceIP, uint32_t destinationIP, uint16_t sourcePort, uint16_t destinationPort)
 {
+    rwlockReadLock(&socket_list_lock);
     socket* s = *((socket**)SOCKETSLIST);
 
     //TODO: this should lock so that it would be multi-thread safe
@@ -385,11 +399,16 @@ socket* find_socket(uint32_t sourceIP, uint32_t destinationIP, uint16_t sourcePo
         if (s->destinationIP == destinationIP && s->sourceIP == sourceIP && 
             s->destinationPort == destinationPort && s->sourcePort == sourcePort)
         {
+            // sanity check. Not supposed to be locked, it means someone else did not release it
+            if (s->deletion_lock == 1) __asm("int $3");
+            s->deletion_lock = 1;
+            rwlockReadUnlock(&socket_list_lock);
             return s;
         }
         s = s->next;
     }
 
+    rwlockReadUnlock(&socket_list_lock);
     return 0;
 }
 
@@ -398,6 +417,7 @@ socket* find_socket(uint32_t sourceIP, uint32_t destinationIP, uint16_t sourcePo
 // the socket itself.
 socket* find_listening_socket(uint32_t sourceIP, uint16_t sourcePort)
 {
+    rwlockReadLock(&socket_list_lock);
     socket* s = *((socket**)SOCKETSLIST);
 
     //TODO: this should lock so that it would be multi-thread safe
@@ -409,12 +429,17 @@ socket* find_listening_socket(uint32_t sourceIP, uint16_t sourcePort)
             if (s->destinationIP == 0 && s->sourceIP == sourceIP &&
                 s->destinationPort == 0 && s->sourcePort == sourcePort)
             {
+                // sanity check. Not supposed to be locked, it means someone else did not release it
+                if (s->deletion_lock == 1) __asm("int $3");
+                s->deletion_lock = 1;
+                rwlockReadUnlock(&socket_list_lock);
                 return s;
             }
         }
         s = s->next;
     }
 
+    rwlockReadUnlock(&socket_list_lock);
     return 0;
 }
 
@@ -588,7 +613,12 @@ void tcp_process(char* buffer, uint16_t size, uint32_t from, uint32_t to)
     //TODO: between here and the end of the function, is a window where a user could delete the socket
     //      so this is very dangerous
     if (s == 0) return;
-    if (s->tcp.state >= 0x80) return;
+    if (s->tcp.state >= 0x80)
+    {
+
+        s->deletion_lock = 0;
+        return;
+    }
 
 
     //TCP flags:
@@ -621,4 +651,6 @@ void tcp_process(char* buffer, uint16_t size, uint32_t from, uint32_t to)
         s->tcp.nextExpectedSeq = __builtin_bswap32(h->sequence)+size;
         tcp_send_ack(s);
     }
+
+    s->deletion_lock = 0;
 }

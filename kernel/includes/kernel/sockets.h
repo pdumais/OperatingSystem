@@ -62,6 +62,7 @@ struct _socket
     uint16_t messageTypeWanted;
     uint64_t queueLock;
     uint64_t owner;
+    uint8_t  deletion_lock;
     char receivedSegments[RING_BUFFER_SIZE];
 };
 
