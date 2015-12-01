@@ -7,7 +7,7 @@ DISKSIZE=10240 #5 meg divided by 512
 image:
 	cd kernel && make
 	cd bootloader && make
-	cd tests && make
+	 #cd tests && make
 	cd userapps && make
 	mkdir -p image
 	dd if=/dev/zero of=image/disk.img count=$(DISKSIZE)

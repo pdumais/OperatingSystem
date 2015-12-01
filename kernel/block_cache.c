@@ -1,3 +1,4 @@
+#include "includes/kernel/types.h"
 #include "block_cache.h"
 #include "../memorymap.h"
 #include "utils.h"
@@ -13,89 +14,89 @@ extern int ata_write(unsigned int dev, unsigned long sector, char* buffer, unsig
 extern unsigned char ata_isBusy(unsigned char);
 extern void memcpy64(char* source, char* dest, unsigned long size);
 extern unsigned long getTicksSinceBoot();
+extern void spinLock(uint64_t*);
+extern void spinUnlock(uint64_t*);
+extern void rwlockWriteLock(uint64_t*);
+extern void rwlockWriteLock(uint64_t*);
+extern void rwlockWriteUnlock(uint64_t*);
+extern void rwlockReadLock(uint64_t*);
+extern void rwlockReadUnlock(uint64_t*);
+extern void rwlockWriteUnlock(uint64_t*);
+extern void rwlockReadLock(uint64_t*);
+extern void rwlockReadUnlock(uint64_t*);
 
 // forward declarations
 void onxferComplete(unsigned char dev, unsigned long block, unsigned long count);
+void onataReady(unsigned char dev);
 void schedule_io(int dev);
+bool transitionFromIdle(struct block_cache_entry* cacheEntry, uint8_t newstate);
 
-//  WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
-// When block cache was implemented, the OS did not support SMP. 
-// The block cache is not safe. Should modify it as per doc/blockcache
-//  WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
-
+uint64_t cache_lock = 0;
+uint64_t scheduleio_lock = 0;
 
 // The block cache should not be fixed-sized. It should grow indefinitely.
 //      it should also be implemented as a tree for faster search
-//      but in order to dynamically allocate entries, we need some kind of memory pool
-//      kindof like the slab allocator on linux. The OS currently does not have such a mechanism
 struct block_cache_entry cache[CACHE_SIZE]={0};
 
 
-// this will return a matching cache entry. If no entry is found, the first free entry is returned.
-// defaultFlags are the flags that will be set if a new block is created
-struct block_cache_entry* getCacheEntry(unsigned char dev, unsigned long block, 
-        unsigned int creationFlags, 
-        unsigned int reserveFlags, 
-        unsigned int* previousFlags)
+// This will return either 
+//  - a new empty block 
+//  - an existing block
+//  - zero is returned if cache is full and no block was found
+//
+// If the block existed already, the usage count is increased and
+// the block is returned. The calling function will need to wait until the 
+// block becomes ready if it is not.
+// If two threads attempted to read the same block or one read and other thread writes,
+// it would be impossible that two blocks would get created since this function is 
+// serializing (becaue of the spinlock) So if the first thread attempted to read, then
+// a new block would get created. The second thread, attempting to read or write would
+// find that block and wait until it becomes uptodate.
+struct block_cache_entry* getOrCreateCacheEntry(unsigned char dev, unsigned long block, bool forWrite)
 {
+    // Since we are locking the whole cache here, there is no way
+    // that two threads can create a new block at the same time.
+    spinLock(&cache_lock);
     unsigned int i;
-    //unsigned long interruptsFlags;
     struct block_cache_entry* entry = 0;
-    //CLI(interruptsFlags);
+    uint8_t newstate = BLOCK_CACHE_RESERVED_FOR_NEW_WRITE_CREATION; 
+    if (forWrite == 0)  newstate = BLOCK_CACHE_RESERVED_FOR_NEW_READ_CREATION;
 
     for (i=0;i<CACHE_SIZE;i++)
     {
-        if (cache[i].flags&CACHE_BLOCK_VALID)
+        uint8_t blockstate = cache[i].state;
+        if ((cache[i].device == dev) && (cache[i].block == block) && (blockstate != BLOCK_CACHE_FREE))
         {
-            if (cache[i].device == dev && cache[i].block == block)
-            {
-
-//TODO: if another CPU calls clearCache, this block will be deleted. 
-// Could LOCK(block). Then we could know if we can operate on it. 
-
-                // an entry was found, so use it.
-                // we set the IN_USE flag because once the block is read from disk,
-                // the IRQ will clear the read_pending flag. It is possible that another thread
-                // would delete that cache entry (because it would need more cache entries for a big request)
-                // and then the entry would get deleted before it would even be consumed by this current thread.
-                // in such a case, the block is reused for another request and gets
-                // fullfilled before this current thread returns. So this thread would detect the block as being ok
-                // but it would not match the proper block number. 
-                // the CACHE_IN_USE will prevent the block from being deleted.
-                *previousFlags = cache[i].flags;
-                cache[i].flags |= reserveFlags;
-                cache[i].lastAccess = getTicksSinceBoot(); // That wont wrap around... trust me.
-                //STI(interruptsFlags);
-//TODO: if we locked "entry", then we should unlock it.
-
-                return &cache[i];
-            }
+            //TODO: make sure the block is still not free and increment usage count
+            cache[i].lastAccess = getTicksSinceBoot(); 
+            spinUnlock(&cache_lock);
+            return &cache[i];
         }
-        else if (!(cache[i].flags&CACHE_IN_USE)) 
+        else if (blockstate == BLOCK_CACHE_FREE)
         {
-            // if falgs was set to CACHE_IN_USE for VALID is clear, it means that another thread
-            // is currently assigning a request to that block. so don't use it.
-            if (entry == 0) entry = &cache[i];
+            // If an entry is 0, then it is a candidate for a new block
+            // in case we don't find a match
+            // Since this function is the only one that can assign a new block
+            // and it locks, then it is safe to say that the state will stay 0.
+            entry = &cache[i];
         }
-    }    
+    }
+
     if (entry == 0)
     {
-        *previousFlags = 0;
-        //STI(interruptsFlags);
+        // block was not found and there are no candidates for a new block
+        spinUnlock(&cache_lock);
         return 0;
     }
 
-//TODO: if two CPU does that, they will both own that entry. We should verify if it is still free
-//      and restart again if not (cmpxchg)
- 
-    // At this point, we have an empty cache entry. see comment above for why we set CACHE_IN_USE
-    entry->flags = creationFlags;
+    entry->state = newstate;
     entry->lastAccess = getTicksSinceBoot();
     entry->block = block;
     entry->device = dev;
-    *previousFlags = 0;
-    //STI(interruptsFlags);
+
+    spinUnlock(&cache_lock);
     return entry;
+
 }
 
 
@@ -105,11 +106,7 @@ struct block_cache_entry* getFirstPendingReadCacheEntry(unsigned char dev)
     unsigned int i;
     for (i=0;i<CACHE_SIZE;i++)
     {
-        if (((cache[i].flags&(CACHE_BLOCK_VALID|CACHE_READ_PENDING)) == (CACHE_BLOCK_VALID|CACHE_READ_PENDING)) 
-            && (cache[i].device==dev))
-        {
-            return &cache[i];
-        }
+        if (cache[i].state == BLOCK_CACHE_PENDING_READ) return &cache[i];
     }
     return 0;
 }
@@ -119,105 +116,126 @@ struct block_cache_entry* getFirstPendingWriteCacheEntry(unsigned char dev)
     unsigned int i;
     for (i=0;i<CACHE_SIZE;i++)
     {
-        if (((cache[i].flags&(CACHE_BLOCK_VALID|CACHE_WRITE_PENDING)) == (CACHE_BLOCK_VALID|CACHE_WRITE_PENDING)) 
-            && (cache[i].device==dev))
-        {
-            return &cache[i];
-        }
+        if (cache[i].state == BLOCK_CACHE_PENDING_WRITE) return &cache[i];
     }
     return 0;
 }
+
 
 
 // This will delete some cache entries to be reused.
 // We delete the oldest blocks
 void clearCacheEntries(unsigned int count)
 {
-    unsigned int i,i2,i3;
-    //unsigned long interruptsFlags;
+    uint64_t i;
 
-    // Another thread could mark the block as IN_USE while we are marking it as zero.
-    //CLI(interruptsFlags);
-    for (i2=0;i2<count;i2++)
+    while (count)
     {
         unsigned long leastAccess = 0xFFFFFFFFFFFFFFFF;
         struct block_cache_entry* entry = 0;
         for (i=0;i<CACHE_SIZE;i++)
         {
-            // we should never delete a cache entry that is write-pending
-            if (!(cache[i].flags&CACHE_BLOCK_VALID)) continue;
-            
-            if (!(cache[i].flags&(CACHE_IN_USE|CACHE_WRITE_PENDING)))
+            if ((cache[i].state == BLOCK_CACHE_IDLE) && (cache[i].lastAccess < leastAccess))
             {
-//TODO: if another CPU was requesting that block and it was given to him (marked as IN_USE or WRITE_PENDING)
-//      we are going to delete it here and data will be corrupted.
-// CPU1: getCacheEntry, found block but not marked IN_USE yet
-// CPU2: is here. Clear the block
-// CPU1: marks block as IN_USE and memcpy to user buffer: CORRUPTION
-                if (cache[i].lastAccess < leastAccess)
-                {
-                    leastAccess = cache[i].lastAccess;
-                    entry = &cache[i];
-                    i3 = i;
-                }
+                leastAccess = cache[i].lastAccess;
+                entry = &cache[i];
             }
         }
     
-        if (entry == 0)
-        {
-            //STI(interruptsFlags);
-            return;
-        }
-        entry->flags = 0;
-        entry->device=-1;
-        entry->block=-1;
-    }
+        if (entry == 0) return;
 
-    //STI(interruptsFlags);
+        // we set it to TRASHED temporarily just so it wont be used by something else
+        if (transitionFromIdle(entry, BLOCK_CACHE_TRASHED))
+        {
+            entry->device=-1;
+            entry->block=-1;
+            entry->state = BLOCK_CACHE_FREE;
+            count--;
+        }
+    }
 }
 
 
 void block_cache_init(char* cacheAddress)
 {
     unsigned int i;
-    unsigned long baseAddr = cacheAddress;
+    uint64_t baseAddr = (uint64_t)cacheAddress;
     for (i=0;i<CACHE_SIZE;i++)
     {
-        cache[i].data = baseAddr;
-        cache[i].flags = 0;
+        cache[i].data = (char*)baseAddr;
+        cache[i].state = 0;
+        cache[i].bufferlock = 0;
+        cache[i].idle_transition_critical_section = 0;
         baseAddr+=512;
     }
 
-    init_ata(&onxferComplete);
+    init_ata(&onxferComplete, &onataReady);
+}
+
+void onataReady(unsigned char dev)
+{
+    // This handler is called when the ata handler has changed to ready state.
+    // But it is possible that another competing thread initiates a transfer 
+    // in that same time frame so the device would become unavailable again.
+    schedule_io((unsigned int)dev);
 }
 
 void onxferComplete(unsigned char dev, unsigned long block, unsigned long count)
 {
-    unsigned long i;
+    unsigned long i,n;
     unsigned int temp;
     struct block_cache_entry* entry;
 
     for (i=block;i<(block+count);i++)
     {
-        entry = getCacheEntry(dev,i,0,0,&temp);
-        if (!entry) continue;
-        if (entry->flags&CACHE_BLOCK_VALID)
+        for (n=0;n<CACHE_SIZE;n++)
         {
-            entry->flags &= ~(CACHE_READ_PENDING|CACHE_WRITE_PENDING);
+            if (cache[n].device == dev && cache[n].block == i)
+            {
+                if (cache[n].state == BLOCK_CACHE_READING || cache[n].state == BLOCK_CACHE_WRITING)
+                {
+                    cache[n].state = BLOCK_CACHE_IDLE;
+                }
+                else
+                {
+                    __asm("int $3");
+                }
+            }
         }
     }
-
-    // prepare the next request now that we know we are done with one.
-    //TODO: if we are blocking in that function, it should not be called here. since we are in a IRQ handler right now.
-    schedule_io(dev);
 }
 
+// Upon exiting that function, it is guaranteed that the block
+// will either be in pending_write, writing or uptodate. 
+// The state will not transition to any other state (but could
+// transition to 1 of those 3) because the readers count will be 
+// increased.
+void lockBlockForUserRead(struct block_cache_entry* cacheEntry)
+{
+    // We increase the readers count. At that point, the block
+    // will not transition to a state other than those that
+    // imply that the block is up to date. But it could be to one
+    // of those other states already so we will wait until it
+    // becomes up to date
+    // The idle_transition critical section must be locked when
+    // incrementing the readers counter since it is not allowed
+    // to transition from IDLE when readers are present
+    spinLock(&cacheEntry->idle_transition_critical_section);
+    __asm("lock incq (%0)" : : "r"(&cacheEntry->readers));
+    spinUnlock(&cacheEntry->idle_transition_critical_section);
 
+    while ((cacheEntry->state != BLOCK_CACHE_PENDING_WRITE) &&
+           (cacheEntry->state != BLOCK_CACHE_IDLE) &&
+           (cacheEntry->state != BLOCK_CACHE_WRITING))
+    {
+        yield();
+    }
+}   
 
 //TO IMPROVE: find number of consecutive blocks that are not cached before 
 //      issuing a read request but we must not exceed cache size
 //      because right now, we issue a read sector by sector. but IRQ handler can already handle several sectors
-//      will need to modify schedule_io as well \if we do that.
+//      will need to modify schedule_io as well if we do that.
 int block_cache_read(unsigned long blockNumber, int dev, char* buffer, unsigned int numberOfBlocks)
 {
     unsigned long i;
@@ -228,13 +246,11 @@ int block_cache_read(unsigned long blockNumber, int dev, char* buffer, unsigned 
     {
         // Get a cache entry. either a valid entry or a new empty entry will be returned.
         // If zero is returned, it means the cache is full. We will then delete some old entries.
-//TODO: getCacheEntry should have atomically reserved the block for us. We should be guaranteed 
-// that know one will mess with it.
-        cacheEntry = getCacheEntry(dev, i,CACHE_READ_PENDING|CACHE_BLOCK_VALID|CACHE_IN_USE, CACHE_BLOCK_VALID|CACHE_IN_USE , &oldFlags);
+        cacheEntry = getOrCreateCacheEntry(dev, i, false);
         while (cacheEntry == 0)
         {
             clearCacheEntries(1);
-            cacheEntry = getCacheEntry(dev, i,CACHE_READ_PENDING|CACHE_BLOCK_VALID|CACHE_IN_USE, CACHE_BLOCK_VALID|CACHE_IN_USE, &oldFlags);
+            cacheEntry = getOrCreateCacheEntry(dev, i, false);
             // if after attempting to delete entries the cache is still full, we should yield and wait
             // for some entries to free up.
             if (cacheEntry == 0)
@@ -243,75 +259,95 @@ int block_cache_read(unsigned long blockNumber, int dev, char* buffer, unsigned 
             }
         }
 
-        // If the block was VALID, then it was not created new. So no need to issue a read request.
-        // since the block contains the data already.
-        if (!(oldFlags&CACHE_BLOCK_VALID)) 
+        if (cacheEntry->state == BLOCK_CACHE_RESERVED_FOR_NEW_READ_CREATION)
         {
-            // this function will look in the caches to find pending blocks and will issue
-            // a read command if the device is not busy. If it is busy, it won't do anything
-            // but at the end of the IRQ, schedule will be called again.
+            // when block is reserved for creation, it is guaranteed not to be used
+            // by any other threads so it safe to test and change the state without locking
+            cacheEntry->state = BLOCK_CACHE_PENDING_READ;
             schedule_io(dev);
         }
+    
+        // At this point we are guaranteed to have a new block or an existing block.
+        lockBlockForUserRead(cacheEntry);
 
-        // block until the sector we are requesting is available.
-        // If the block was not created new, these flags wont be set so ignore that.
-        // but if the block was created new, then we need to wait for it to be filled up.
-        while ((cacheEntry->flags&(CACHE_READ_PENDING|CACHE_FILL_PENDING)))
-        {
-            yield();
-        }
-
-        //Note: If the block is write_pending, it doesn't matter. we are going to get
-        // the latest info. We dont want the block on disk since it is not fresh because
-        // there is a pending rewrite.
+        // At this point, the buffer PENDING_USER_READ
+        rwlockReadLock(&cacheEntry->bufferlock);
         memcpy64(cacheEntry->data,(char*)&buffer[512*(i-blockNumber)],512);
-        cacheEntry->flags &= ~CACHE_IN_USE;
+        rwlockReadUnlock(&cacheEntry->bufferlock);
+        __asm("lock decq (%0)" : : "r"(&cacheEntry->readers));
     }
-
-    // to debug
-    //for (i=0;i<16;i++) pf("%x ",(unsigned char)buffer[i]&0xFF);
-
 }
 
 
 void schedule_io(int dev)
 {
-//    unsigned long interruptsFlags;
+    // We prioritize read requests over writes. write requests will be delayed until
+    // no more read requests. Again, this is not optimal, so it should be reworked
+    spinLock(&scheduleio_lock);
+    struct block_cache_entry* entry = getFirstPendingReadCacheEntry(dev);
 
-    // Need to clear interrupts because we must make sure that an IRQ does not occur
-    // when a thread calls this function. Otherwise there is a chance that we initiate
-    // 2 disk operations
-//    CLI(interruptsFlags);
-
-    // if device is already busy, leave the request enqueued and it will be picked up 
-    // after next IRQ. but if the device is not busy, then we need to schedule it now.
-    if (!ata_isBusy(dev))
+    if (entry != 0)
     {
-//TODO: Dangerous! If two CPU fall here at the same time, 2 read/write requests will
-//   be sent to ATA driver.
-
-        // We prioritize read requests over writes. write requests will be delayed until
-        // no more read requests. Again, this is not optimal, so it should be reworked
-
-        //TO IMPROVE: getting the first pending request is not a fair algorithm at all
-        struct block_cache_entry* entry = getFirstPendingReadCacheEntry(dev);
-        if (entry != 0)
+        entry->state = BLOCK_CACHE_READING;
+        if (ata_read(dev, entry->block, entry->data, 1))
         {
-            ata_read(dev, entry->block, entry->data, 1);
+            spinUnlock(&scheduleio_lock);
+            return;
         }
-        else
+        entry->state = BLOCK_CACHE_PENDING_READ;
+    }
+    
+    entry = getFirstPendingWriteCacheEntry(dev);
+    if (entry != 0)
+    {
+        entry->state = BLOCK_CACHE_WRITING;
+        if (!ata_write(dev, entry->block, entry->data, 1))
         {
-            struct block_cache_entry* wentry = getFirstPendingWriteCacheEntry(dev);
-            if (wentry != 0)
-            {
-                ata_write(dev, wentry->block, wentry->data, 1);
-            }
+            entry->state = BLOCK_CACHE_PENDING_WRITE;
         }
     }
-//    STI(interruptsFlags);
+    spinUnlock(&scheduleio_lock);
 }
 
+bool transitionFromIdle(struct block_cache_entry* cacheEntry, uint8_t newstate)
+{
+    bool ret = false;
+    spinLock(&cacheEntry->idle_transition_critical_section);
+    if (cacheEntry->state == BLOCK_CACHE_IDLE)
+    {
+        cacheEntry->state = newstate;
+        ret = true;
+    }
+    spinUnlock(&cacheEntry->idle_transition_critical_section);
+    return ret;
+}
 
+// This function will guarantee that the block is PENDING_USER_WRITE
+// upon returning. If the block was already PENDING_USER_WRITE, it
+// will wait since the function succeeds only if transitioning from 
+// IDLE to PENDING_USER_WRITE
+void transitionBlockToFillPending(struct block_cache_entry* cacheEntry)
+{
+    if (cacheEntry->state == BLOCK_CACHE_RESERVED_FOR_NEW_WRITE_CREATION)
+    {
+        cacheEntry->state = BLOCK_CACHE_PENDING_USER_WRITE;
+        return;
+    }
+        
+    while (1)
+    {
+        // We will retest, atomically, that condition in transitionFromIdle
+        if (cacheEntry->state == BLOCK_CACHE_IDLE && cacheEntry->readers ==0)
+        {
+            if (transitionFromIdle(cacheEntry,BLOCK_CACHE_PENDING_USER_WRITE)) break;
+        }
+        yield();
+    }
+}
+
+//TO IMPROVE: It would be nice if we could overwrite a block that is already WRITE_PENDING
+//            or READ_PENDING
+//            It would also be nice to copy in more than one block at a time.
 int block_cache_write(unsigned long blockNumber, int dev, char* buffer, unsigned int numberOfBlocks)
 {
     unsigned long i;
@@ -320,45 +356,36 @@ int block_cache_write(unsigned long blockNumber, int dev, char* buffer, unsigned
 
     for (i = blockNumber; i< blockNumber+numberOfBlocks; i++)
     {
-        while (1)
+        // Get a cache entry. either a valid entry or a new empty entry will be returned.
+        // If zero is returned, it means the cache is full. We will then delete some old entries.
+        // We set the block as FILL_PENDING initially because a read request could come it from 
+        // another thread between the time that we have allocated the block and the time where we 
+        // copy the data in the buffer
+        cacheEntry = getOrCreateCacheEntry(dev, i, true);
+        while (cacheEntry == 0)
         {
-            // Get a cache entry. either a valid entry or a new empty entry will be returned.
-            // If zero is returned, it means the cache is full. We will then delete some old entries.
-            // We set the block as FILL_PENDING initially because a read request could come it from 
-            // another thread between the time that we have allocated the block and the time where we 
-            // copy the data in the buffer
-            cacheEntry = getCacheEntry(dev, i, CACHE_FILL_PENDING|CACHE_BLOCK_VALID|CACHE_IN_USE,CACHE_FILL_PENDING|CACHE_BLOCK_VALID|CACHE_IN_USE, &oldFlags);
-            while (cacheEntry == 0)
-            {
-                clearCacheEntries(1);
-                cacheEntry = getCacheEntry(dev, i, CACHE_FILL_PENDING|CACHE_BLOCK_VALID|CACHE_IN_USE,CACHE_FILL_PENDING|CACHE_BLOCK_VALID|CACHE_IN_USE,  &oldFlags);
-                // if after attempting to delete entries the cache is still full, we should yield and wait
-                // for some entries to free up.
-                if (cacheEntry == 0)
-                {
-                    yield();
-                }
-            }
+            clearCacheEntries(1);
+            cacheEntry = getOrCreateCacheEntry(dev, i, true);
 
-            // if the cache entry is already write_pending, then wait until it is written
-            // yield and try again until it is fully written. 
-            // Then overwrite it again. If it is read pending, then do the same thing
-            // and wait for the disk operation to be completed.
-            if (!(oldFlags&(CACHE_FILL_PENDING|CACHE_WRITE_PENDING|CACHE_READ_PENDING))) break;
-            yield();
+            // if after attempting to delete entries the cache is still full, we should yield and wait
+            // for some entries to free up.
+            if (cacheEntry == 0)
+            {
+                yield();
+            }
         }
 
-        //Note: there is no chance that between the last check and here that
-        //  the block be marked as read pending by another thread.
-        //  a read at this point would not initiate a read request since the block
-        //  exists and is pending fill.    
-        // No chances for write_pending either because the block will be set as CACHE_FILL_PENDING
-        // and we are checking that earlier.
-        // so we are basically guaranteed that we are the only owner of the block in write-mode if we are here.
-        memcpy64((char*)&buffer[512*(i-blockNumber)],cacheEntry->data,512);
-        cacheEntry->flags |= (CACHE_WRITE_PENDING);
-        cacheEntry->flags &= ~(CACHE_FILL_PENDING|CACHE_IN_USE);
+        // At this point, we have a new block or an existing block.
+        // We must transition the block to user_write but only
+        // if there are no readers and the block is either new or idle.
+        transitionBlockToFillPending(cacheEntry);
 
+        // At this point, block is guaranteed to be in USER_WRITE state
+        //TODO: RWlock buffer
+        rwlockWriteLock(&cacheEntry->bufferlock);
+        memcpy64((char*)&buffer[512*(i-blockNumber)],cacheEntry->data,512);
+        rwlockWriteUnlock(&cacheEntry->bufferlock);
+        cacheEntry->state = BLOCK_CACHE_PENDING_WRITE;
         schedule_io(dev);
     }
 }

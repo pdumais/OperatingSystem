@@ -1,12 +1,5 @@
-- fix errors with new compiler warnings
-    test:
-        multiple connections to web server
-        ping
-        hex editor
-        date
-
-- telnet client application
-
+- socket locking
+- mempool locking
 ------------ To do later -------------------------------
 - networking
     - sockets still needs a lot of improvements (doc/net)
@@ -23,8 +16,6 @@
 - currently, ring3 apps can access kernel mem since kernel mem is not protected.
     lock kernel code, bios area, kernel data, IDT (read only)
     video mem, page tables
-- block cache: the block cache is not multi-cpu friendly (see doc/blockcache)
-    would need a test suite to handle all normal cases and concurrency cases
 - serial port: can feed console like keyboard, could make a separate flush function
 - IRQ sharing is inneficient: ie: rtl8139 loops trhough 32 devices and checks ISR
     should stop looping when seeing first empty device and and should check ISR faster
@@ -35,6 +26,11 @@
         when we arrive at the second mapping we will free it again, so other thread will lose it
     - creating more consoles than what is allowed has no error handling
 - see memorymanagement in doc folder
+- block cache test:
+        read from block created by write
+        write to read block
+        2 writes to same block
+        read more entries than cache to test clearCache
 ===================== Cool stuff to try =====================
 - usb driver
 - disk should be partitioned with MBR

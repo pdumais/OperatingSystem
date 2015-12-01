@@ -6,12 +6,11 @@
 //  we only support 48bitLBA (but we dont check for it)
 //  dont support cdrom (ATAPI)
 
-// This code does not locking and does not prevent multiple requests at the same time.
-// It is not the responsibility of this driver to do so.
-
+extern unsigned long long atomic_set(unsigned long long var_addr,unsigned long long bit);
 extern void getInterruptInfoForBus(unsigned long bus, unsigned int* buffer);
 extern unsigned int pci_getBar(unsigned int dev,unsigned char bar);
 typedef void (*atairqcallback)(unsigned char, unsigned long, unsigned long);
+typedef void (*atareadycallback)(unsigned char);
 
 // Warning: we only support PATA now and we dont get registers from PCI
 #define CH1BASE 0x1F0
@@ -93,8 +92,10 @@ char tmpBuffer[512];
 char channelSlaveSelection=0;
 unsigned long busMasterRegister;
 struct operation pendingRequest[2];
+unsigned long long devices_lock[2];
 
-atairqcallback callback;
+atairqcallback irq_callback;
+atareadycallback ready_callback;
 
 void atahandler(unsigned short base, unsigned char channel)
 {
@@ -108,10 +109,13 @@ void atahandler(unsigned short base, unsigned char channel)
     else if (pendingRequest[channel].pending)
     {
         pendingRequest[channel].pending = 0;
-        callback(pendingRequest[channel].dev,pendingRequest[channel].block,pendingRequest[channel].count);
+        irq_callback(pendingRequest[channel].dev,pendingRequest[channel].block,pendingRequest[channel].count);
     }
     INPORTB(val,busMasterRegister+2+(channel*8));
     OUTPORTB(4,busMasterRegister+2+(channel*8));
+
+    devices_lock[channel] = 0;
+    ready_callback(pendingRequest[channel].dev);
 }
 
 void atahandler1()
@@ -206,12 +210,13 @@ void ata_init_dev(unsigned short dev, unsigned char slave)
 
 }
 
-void init_ata(atairqcallback irqcallback)
+void init_ata(atairqcallback irqcallback, atareadycallback readycallback)
 {
     int dev;
     int i;
 
-    callback = irqcallback;
+    irq_callback = irqcallback;
+    ready_callback = readycallback;
 
     dev = pci_getDevice(0x8086,0x7010);
     pci_enableBusMastering(dev);
@@ -284,6 +289,8 @@ int ata_read(unsigned int dev, unsigned long sector, char* buffer, unsigned long
 
 
     convertDevId(dev,&device,&slave);
+    if (atomic_set(&devices_lock[device],0) == 1) return 0;
+
     ata_select_device(device,slave);
     pendingRequest[device].pending = 1;
     pendingRequest[device].block = sector;
@@ -322,6 +329,7 @@ int ata_read(unsigned int dev, unsigned long sector, char* buffer, unsigned long
 
     // Start DMA (read)
     OUTPORTB(0b00001001,bmr);
+    return 1;
 }
 
 int ata_write(unsigned int dev, unsigned long sector, char* buffer, unsigned long count)
@@ -332,6 +340,8 @@ int ata_write(unsigned int dev, unsigned long sector, char* buffer, unsigned lon
     struct PRD *prdt = (struct PRD*)PRDT1;
 
     convertDevId(dev,&device,&slave);
+    if (atomic_set(&devices_lock[device],0) == 1) return 0;
+
     ata_select_device(device,slave);
     pendingRequest[device].pending = 1;
     pendingRequest[device].block = sector;
@@ -372,6 +382,7 @@ int ata_write(unsigned int dev, unsigned long sector, char* buffer, unsigned lon
     OUTPORTB(0b00000001,bmr);
 
 //TODO: need to do a cache flush after writing
+    return 1;
 }
 
 
