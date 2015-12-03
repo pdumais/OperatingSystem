@@ -1,5 +1,6 @@
 #include "types.h"
 #include "systemhandle.h"
+#include "hashtable.h"
 
 #define RING_BUFFER_SIZE (6*1024)
 #define MAX_BACKLOG 10              // should allow more
@@ -63,6 +64,7 @@ struct _socket
     uint64_t queueLock;
     uint64_t owner;
     uint8_t  deletion_lock;
+    hashtable_node hash_node;
     char receivedSegments[RING_BUFFER_SIZE];
 };
 
