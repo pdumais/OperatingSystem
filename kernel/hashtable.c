@@ -38,7 +38,7 @@ uint64_t cumulativehash(hashtable* ht, uint64_t keysize, uint64_t* key)
 
 uint64_t hashtable_getrequiredsize(unsigned char keysize)
 {
-    uint64_t listsize = (1 << keysize)*sizeof(hashtable_node);
+    uint64_t listsize = (1 << keysize)*sizeof(hashtable_bucket);
     uint64_t tablesize = listsize + sizeof(hashtable);
 
     return tablesize;
@@ -64,19 +64,21 @@ void hashtable_add(hashtable* ht,uint64_t keysize, uint64_t* key, hashtable_node
     uint64_t h = ht->hash_function(ht,keysize,key);
     node->key = key;
     node->keysize = keysize;
+    node->next = 0;
 
-    rwlockWriteLock(&ht->tablelock);
-    hashtable_node* n = ht->nodes[h];
+    hashtable_bucket* bucket = &ht->buckets[h];
+    rwlockWriteLock(&bucket->lock);
+    hashtable_node* n = bucket->node;
     if (n==0)
     {
-        ht->nodes[h] = node;
+        bucket->node = node;
     }
     else
     {
         while (n->next != 0) n = n->next;
         n->next = node;
     }
-    rwlockWriteUnlock(&ht->tablelock);
+    rwlockWriteUnlock(&bucket->lock);
 }
 
 inline bool comparekey(uint64_t* src, uint64_t* dst, uint64_t size)
@@ -90,10 +92,10 @@ void hashtable_remove(hashtable* ht,uint64_t keysize, uint64_t* key)
 {
     if (ht->hash_function == 0) return;
     uint64_t h = ht->hash_function(ht,keysize,key);
-//    uint64_t i;
 
-    rwlockWriteLock(&ht->tablelock);
-    hashtable_node* n = ht->nodes[h];
+    hashtable_bucket* bucket = &ht->buckets[h];
+    rwlockWriteLock(&bucket->lock);
+    hashtable_node* n = bucket->node;
     hashtable_node* previous = 0;
     while (n != 0)
     {
@@ -101,20 +103,20 @@ void hashtable_remove(hashtable* ht,uint64_t keysize, uint64_t* key)
         {
             if (previous == 0)
             {
-                ht->nodes[h] = n->next;
+                bucket->node = n->next;
             }
             else
             {
                 previous->next = n->next;
             }
             n->next = 0;
-            rwlockWriteUnlock(&ht->tablelock);
+            rwlockWriteUnlock(&bucket->lock);
             return;
         }
         previous = n;
         n = n->next;
     }
-    rwlockWriteUnlock(&ht->tablelock);
+    rwlockWriteUnlock(&bucket->lock);
 }
 
 void* hashtable_get(hashtable* ht,uint64_t keysize, uint64_t* key)
@@ -123,9 +125,10 @@ void* hashtable_get(hashtable* ht,uint64_t keysize, uint64_t* key)
 
     void* ret = 0;
 
-    rwlockReadLock(&ht->tablelock);
     uint64_t h = ht->hash_function(ht,keysize,key);
-    hashtable_node* n = ht->nodes[h];
+    hashtable_bucket* bucket = &ht->buckets[h];
+    rwlockReadLock(&bucket->lock);
+    hashtable_node* n = bucket->node;
     while (n != 0)
     {   
         if (comparekey(n->key,key,keysize))
@@ -135,7 +138,7 @@ void* hashtable_get(hashtable* ht,uint64_t keysize, uint64_t* key)
         }
         n = n->next;
     }
-    rwlockReadUnlock(&ht->tablelock);
+    rwlockReadUnlock(&bucket->lock);
 
     return ret;
 }

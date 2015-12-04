@@ -45,25 +45,28 @@ typedef struct
 
 } socket_info;
 
-struct _socket
+typedef struct
 {
-    system_handle handle;
-    tcp_state tcp;
-    struct _socket* next;                       
-    struct _socket* previous;                       
-    socket_info backlog[MAX_BACKLOG];                       
-   
-    uint16_t backlogSize;
     uint32_t destinationIP;
     uint32_t sourceIP;
     uint16_t destinationPort;
     uint16_t sourcePort;
+    uint32_t paddingTo64BitBoundary;
+} socket_description;
+
+struct _socket
+{
+    system_handle handle;
+    tcp_state tcp;
+    socket_info backlog[MAX_BACKLOG];                       
+
+    socket_description desc;   
+    uint16_t backlogSize;
     uint32_t qin;
     uint32_t qout;
     uint16_t messageTypeWanted;
     uint64_t queueLock;
     uint64_t owner;
-    uint8_t  deletion_lock;
     hashtable_node hash_node;
     char receivedSegments[RING_BUFFER_SIZE];
 };

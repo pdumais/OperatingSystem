@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     addItem(ht,4,"00000004");
     addItem(ht,5,"10000001");
 
-    if (ht->nodes[ht->hash_function(ht,1,"00000001")] == 0) printf("ERROR %i\r\n",__LINE__);
+    if (ht->buckets[ht->hash_function(ht,1,"00000001")].node == 0) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000001"))->val != 1) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000002"))->val != 2) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000003"))->val != 3) printf("ERROR %i\r\n",__LINE__);
@@ -74,7 +74,7 @@ int main(int argc, char** argv)
     if (((test*)hashtable_get(ht,1,"20000000")) != 0) printf("ERROR %i\r\n",__LINE__);
 
     hashtable_remove(ht,1,"00000002");
-    if (ht->nodes[ht->hash_function(ht,1,"00000001")] == 0) printf("ERROR %i\r\n",__LINE__);
+    if (ht->buckets[ht->hash_function(ht,1,"00000001")].node == 0) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000001"))->val != 1) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000002")) != 0) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000003"))->val != 3) printf("ERROR %i\r\n",__LINE__);
@@ -82,7 +82,7 @@ int main(int argc, char** argv)
     if (((test*)hashtable_get(ht,1,"10000001"))->val != 5) printf("ERROR %i\r\n",__LINE__);
 
     hashtable_remove(ht,1,"00000001");
-    if (ht->nodes[ht->hash_function(ht,1,"00000001")] == 0) printf("ERROR %i\r\n",__LINE__);
+    if (ht->buckets[ht->hash_function(ht,1,"00000001")].node == 0) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000001")) != 0) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000002")) != 0) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000003"))->val != 3) printf("ERROR %i\r\n",__LINE__);
@@ -90,7 +90,7 @@ int main(int argc, char** argv)
     if (((test*)hashtable_get(ht,1,"10000001"))->val != 5) printf("ERROR %i\r\n",__LINE__);
 
     hashtable_remove(ht,1,"00000004");
-    if (ht->nodes[ht->hash_function(ht,1,"00000001")] == 0) printf("ERROR %i\r\n",__LINE__);
+    if (ht->buckets[ht->hash_function(ht,1,"00000001")].node == 0) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000001")) != 0) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000002")) != 0) printf("ERROR %i\r\n",__LINE__);
     if (((test*)hashtable_get(ht,1,"00000003"))->val != 3) printf("ERROR %i\r\n",__LINE__);
@@ -98,7 +98,7 @@ int main(int argc, char** argv)
     if (((test*)hashtable_get(ht,1,"10000001"))->val != 5) printf("ERROR %i\r\n",__LINE__);
 
     hashtable_remove(ht,1,"00000003");
-    if (ht->nodes[ht->hash_function(ht,1,"00000001")] != 0) printf("ERROR %i\r\n",__LINE__);
+    if (ht->buckets[ht->hash_function(ht,1,"00000001")].node != 0) printf("ERROR %i\r\n",__LINE__);
 
 
 }

@@ -32,3 +32,5 @@ disasm:
 tunctl:
 	tunctl -u pat -t tap2 
 	tunctl -u pat -t tap4 
+	chown root:sysadmin /dev/kvm
+	chmod 660 /dev/kvm

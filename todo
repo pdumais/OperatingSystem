@@ -1,19 +1,14 @@
 hashtable
-    change socket implementation
-        The key should be both ip and both ports
-            but that would yield a 96bit value
-            use a 128bit key?
-            use variable lenght key?
-            can fit that info in 64bit? is there unused data?
-        optimization:
-            compile with optimization
-            optimize hash function
-            optimize mem references (as less redirection as possible)
-        put a lock in every slot instead of the whole list
+    destroy all in hashtable that belongs to a process. remove from list also
+    optimization:
+        compile with optimization
+        optimize hash function
+        optimize mem references (as less redirection as possible)
+        instead of using "usingsockets" flag, can we detect if using same socket instead?
+            or lazy delete object?
 
 ------------ To do later -------------------------------
 - networking
-    - replace socket linked list by tree or hashlist
     - sockets still needs a lot of improvements (doc/net)
     - arp_getMAC should not block.
     - udp sockets

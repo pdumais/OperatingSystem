@@ -18,12 +18,18 @@ struct _hashtable_node
 
 typedef struct _hashtable_node hashtable_node;
 
+typedef struct
+{
+    hashtable_node* node;
+    uint64_t lock;
+} hashtable_bucket;
+    
+
 struct _hashtable
 {
     uint64_t (*hash_function)(struct _hashtable*, uint64_t keysize, uint64_t* key);
     unsigned char keysize;
-    uint64_t tablelock;
-    hashtable_node* nodes[];
+    hashtable_bucket buckets[];
 } _hashtable;
 
 typedef struct _hashtable hashtable;
