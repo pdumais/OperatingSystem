@@ -34,6 +34,23 @@
 .extern returnfromIRQ
 .extern ackAPIC
 
+
+// We should be passing a 128bit value to invpcid
+// but we will only push 64bit because the upper
+// 64bit will be ignored anyway when using operation "1"
+#define INVPCID_REAL(PCIDREG) push    PCIDREG;\
+    mov     $1,PCIDREG;\
+    invpcid (%rsp),PCIDREG;\
+    pop     PCIDREG
+
+#define INVPCID_EMULATE(PCIDREG) push    %rdx;\
+    mov     PCIDREG,%rdx;\
+    call    emulate_invpcid;\
+    pop     %rdx
+
+// Use INVPCID_EMULATE if the CPU does not support invpcid
+#define _INVPCID(PCIDREG) INVPCID_REAL(PCIDREG)
+
 .code64
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -108,9 +125,7 @@ clearTaskList:
 ////////////////////////////////////////////////////////////////////////////////////
 tlbShootDownHandler:
     // No need to save registers in the IPI handlers
-
-    mov         %rdi,%rdx
-    call        emulate_invpcid
+    _INVPCID(%rdi)
     ret
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -422,9 +437,9 @@ addTaskInList:
 #ifdef PCID
     // Now invalidate all pages for that PCID in case we are recyling it
     // rdx was set to the PCID
-    call    emulate_invpcid
+    _INVPCID(%rdx)
 
-    push     %rsi
+    push    %rsi
     mov     $IPI_TLB_SHOOTDOWN_VECTOR,%rdi
     mov     %rdx,%rsi
     mov     $0,%rdx
