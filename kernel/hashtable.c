@@ -143,3 +143,64 @@ void* hashtable_get(hashtable* ht,uint64_t keysize, uint64_t* key)
     return ret;
 }
 
+// This function will go through all nodes, locking the current bucket 
+// for write, and will invoke the functor on each node. If the functor returns
+// true, then the node will be removed from the list. This is usefull
+// when wanting to safely remove items based on some other critaria than the key.
+void hashtable_scan_and_clean(hashtable* ht, hashtable_clean_visitor visitor, void* meta)
+{
+    uint64_t tablesize = 1<<ht->keysize;
+    uint64_t i;
+    for (i=0;i<tablesize;i++)
+    {
+        hashtable_bucket* bucket = &ht->buckets[i];
+
+        rwlockWriteLock(&bucket->lock);
+        hashtable_node* n = bucket->node;
+        hashtable_node* previous = 0;
+        while (n != 0)
+        {
+            if (visitor(n->data,meta))
+            {
+                if (previous == 0)
+                {
+                    bucket->node = n->next;
+                }
+                else
+                {
+                    previous->next = n->next;
+                }
+                n = n->next;
+            }
+            else
+            {
+                previous = n;
+                n = n->next;
+            }
+        }        
+        rwlockWriteUnlock(&bucket->lock);
+    }
+}
+
+bool hashtable_visit(hashtable* ht,uint64_t keysize, uint64_t* key,hashtable_visitor visitor, void* meta)
+{
+    if (ht->hash_function == 0) return false;
+
+    uint64_t h = ht->hash_function(ht,keysize,key);
+    hashtable_bucket* bucket = &ht->buckets[h];
+    rwlockReadLock(&bucket->lock);
+    hashtable_node* n = bucket->node;
+    while (n != 0)
+    {
+        if (comparekey(n->key,key,keysize))
+        {
+            visitor(n->data,meta);
+            rwlockReadUnlock(&bucket->lock);
+            return true;
+        }
+        n = n->next;
+    }
+    rwlockReadUnlock(&bucket->lock);
+    return false;
+}
+

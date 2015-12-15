@@ -34,6 +34,9 @@ struct _hashtable
 
 typedef struct _hashtable hashtable;
 
+typedef void (*hashtable_visitor)(void* data, void* meta);
+typedef bool (*hashtable_clean_visitor)(void* data, void* meta);
+
 // The hashtable code will not reserve memory for the hashtable. 
 // You must determine the size of the hashtable with hashtable_getrequiredsize()
 // and then create a buffer of that size and pass it to hashtable_init to it
@@ -43,3 +46,5 @@ void hashtable_init(hashtable*,unsigned char hashsize,unsigned char hash_functio
 void hashtable_add(hashtable*,uint64_t keysize, uint64_t* key, hashtable_node* node);
 void hashtable_remove(hashtable*,uint64_t keysize, uint64_t* key);
 void* hashtable_get(hashtable*,uint64_t keysize, uint64_t* key);
+bool hashtable_visit(hashtable*,uint64_t keysize, uint64_t* key,hashtable_visitor visitor, void* meta);
+void hashtable_scan_and_clean(hashtable*, hashtable_clean_visitor visitor, void* meta);

@@ -71,7 +71,6 @@ void tcp_send_synack(socket* s);
 void tcp_send_rst(socket* s);
 void tcp_close(socket* s);
 
-volatile uint64_t usingsockets = 0;
 uint64_t ephemeralPort = EPHEMERAL_START;
 uint64_t socket_pool = -1;
 uint64_t socket_list_lock;
@@ -171,12 +170,9 @@ void close_socket(socket* s)
 void delete_socket(socket* s)
 {
     remove_socket_from_list(s);
-
-    // We must wait until no one uses the sockets anymore. Only the softirq
-    // handler should be setting that flag. So we wanna make sure it
-    // is done working before we release the socket. It would be a better
-    // idea to only wait if the current socket is being used.
-    while (usingsockets);
+    // Since we use the visit() function of the hashtable in the softIRQ
+    // we are guaranteed that once the socket is removed from the list, 
+    // the softirq handler is not using the socket anymore.
 
     if (s->backlog)
     {
@@ -300,37 +296,22 @@ void remove_socket_from_list(socket* s)
     //TODO: we should only return when we have a guarantee that no one uses the socke anymore
 }
 
+bool clean_visitor(void* data, void* meta)
+{
+    socket* s = (socket*)data;
+    uint64_t id = *((uint64_t*)meta);
+    if (s->owner == id)
+    {
+        s->handle.destructor((system_handle*)s);
+        release_object(socket_pool,s);
+        return true;
+    }
+    return false;
+}
+
 void destroy_sockets(uint64_t pid)
 {
-//TODO: loop through all sockets in list, destroy them and remove from list (visitor)
-//TODO: must release socket mem
-
-/*  rwlockWriteLock(&socket_list_lock);
-    socket* s = *((socket**)SOCKETSLIST);
-
-    while (s)
-    {
-        socket* victim = s;
-        s = s->next;       
-
-        if (victim->owner == pid)
-        {
-            victim->handle.destructor((system_handle*)victim);
-            socket *previous = victim->previous;
-            socket *next = victim->next;
-            if (previous == 0)
-            {
-                *((socket**)SOCKETSLIST) = next;
-                if (next != 0) next->previous = 0;
-            }
-            else
-            {
-                previous->next = next;
-                if (next!=0) next->previous = previous;
-            }
-        }
-    }
-    rwlockWriteUnlock(&socket_list_lock);*/
+    hashtable_scan_and_clean(sockets, &clean_visitor, &pid);
 }
 
 int send(socket* s, char* buffer, uint16_t length)
@@ -374,7 +355,7 @@ int recv(socket* s, char* buffer, uint16_t max)
 // Warning: this function is dangerous since it returns a pointer to a socket. We must make
 // sure that softIRQ is not using the socket when we attempt to delete it. Maybe we should lock
 // the socket itself.
-inline socket* find_socket(uint32_t sourceIP, uint32_t destinationIP, uint16_t sourcePort, uint16_t destinationPort)
+/*inline socket* find_socket(uint32_t sourceIP, uint32_t destinationIP, uint16_t sourcePort, uint16_t destinationPort)
 {
     socket_description sd = {
         .destinationIP=destinationIP,
@@ -385,12 +366,12 @@ inline socket* find_socket(uint32_t sourceIP, uint32_t destinationIP, uint16_t s
     };
     socket* s = (socket*)hashtable_get(sockets,sizeof(socket_description)/8,&sd);
     return s;
-}
+}*/
 
 // Warning: this function is dangerous since it returns a pointer to a socket. We must make
 // sure that softIRQ is not using the socket when we attempt to delete it. Maybe we should lock
 // the socket itself.
-inline socket* find_listening_socket(uint32_t sourceIP, uint16_t sourcePort)
+/*inline socket* find_listening_socket(uint32_t sourceIP, uint16_t sourcePort)
 {
     socket_description sd = {
         .destinationIP=0,
@@ -401,7 +382,7 @@ inline socket* find_listening_socket(uint32_t sourceIP, uint16_t sourcePort)
     };
     socket* s = (socket*)hashtable_get(sockets,sizeof(socket_description)/8,&sd);
     return s;
-}
+}*/
 
 
 void tcp_send_synack(socket* s)
@@ -554,58 +535,83 @@ void tcp_process_fin(socket* s, char* payload, uint16_t size)
     s->tcp.state = SOCKET_STATE_RESET;
 }
 
-void tcp_process(char* buffer, uint16_t size, uint32_t from, uint32_t to)
+typedef struct
 {
+    char* buffer;
+    uint16_t size;
+    uint32_t from;
+    uint32_t to;
+} socket_process_data;
+
+void visit_socket(void* data, void* meta)
+{
+    socket_process_data* spd = (socket_process_data*)meta;
+    socket *s = (socket*)data;
+
+    if ((s==0) || s->tcp.state >= 0x80) return;
+
+    tcp_header *h = (tcp_header*)spd->buffer;
     uint16_t i;
-    tcp_header *h = (tcp_header*)buffer;
     uint16_t flags = __builtin_bswap16(h->flags);
     uint16_t offset = (flags&0xF000)>>10; // SHR 12 * 4 = SHR 10
-    char* payload = (char*)&buffer[offset];
-    size = size-offset;
-
-    usingsockets = 1;
-    socket *s = find_socket(to,from,__builtin_bswap16(h->destination), __builtin_bswap16(h->source));
-    if (s == 0)
-    {
-        // The socket was not found. Maybe the segment was destined to a listening socket
-        // or a socket in the backlog of a listening socket.
-        s = find_listening_socket(to,__builtin_bswap16(h->destination));
-    }
-    if ((s==0) || s->tcp.state >= 0x80)
-    {
-        usingsockets = 0;
-        return;
-    }
+    char* payload = (char*)&spd->buffer[offset];
+    spd->size = spd->size-offset;
 
     //TCP flags:
     // F: 0, S:1, R:2, P:3, A:4, U:5
     if ((flags&0b00010) == 0b000010)
     {
-        tcp_process_syn(s,payload,size-offset,h,from);
+        tcp_process_syn(s,payload,spd->size-offset,h,spd->from);
     }
 
     if ((flags&0b00100) == 0b000100)
     {
-        tcp_process_rst(s,payload,size-offset);
+        tcp_process_rst(s,payload,spd->size-offset);
     }
 
     if ((flags&0b10000) == 0b010000)
     {
-        tcp_process_ack(s,payload,size-offset);
+        tcp_process_ack(s,payload,spd->size-offset);
     }
 
     if ((flags&0b1) == 0b1)
     {
-        tcp_process_fin(s,payload,size-offset);
+        tcp_process_fin(s,payload,spd->size-offset);
     }
 
-    if (size > 0)
+    if (spd->size > 0)
     {
-        tcp_add_segment_in_queue(s,payload,size);
+        tcp_add_segment_in_queue(s,payload,spd->size);
 
         //TODO: an ack might have been sent already if the FIN flag was set.
-        s->tcp.nextExpectedSeq = __builtin_bswap32(h->sequence)+size;
+        s->tcp.nextExpectedSeq = __builtin_bswap32(h->sequence)+spd->size;
         tcp_send_ack(s);
     }
-    usingsockets = 0;
+}
+
+void tcp_process(char* buffer, uint16_t size, uint32_t from, uint32_t to)
+{
+    tcp_header *h = (tcp_header*)buffer;
+    socket_process_data spd;
+    spd.buffer=buffer;
+    spd.size=size;
+    spd.from=from;
+    spd.to=to;
+
+    socket_description sd = {
+        .destinationIP=from,
+        .sourceIP=to,
+        .destinationPort=__builtin_bswap16(h->source),
+        .sourcePort=__builtin_bswap16(h->destination),
+        .paddingTo64BitBoundary=0
+    };
+
+    if (!hashtable_visit(sockets,sizeof(socket_description)/8, &sd, &visit_socket, &spd))
+    {
+        // The socket was not found. Maybe the segment was destined to a listening socket
+        // or a socket in the backlog of a listening socket.
+        sd.destinationIP = 0;
+        sd.destinationPort = 0;
+        hashtable_visit(sockets,sizeof(socket_description)/8, &sd, &visit_socket, &spd);
+    }
 }

@@ -1,11 +1,7 @@
-hashtable
-    destroy all in hashtable that belongs to a process. remove from list also
     optimization:
         compile with optimization
         optimize hash function
         optimize mem references (as less redirection as possible)
-        instead of using "usingsockets" flag, can we detect if using same socket instead?
-            or lazy delete object?
 
 ------------ To do later -------------------------------
 - networking
@@ -47,4 +43,22 @@ hashtable
     - vmx
         - load vmcs with long mode data. boot a vm in long mide
 ======================================================================================
+
+
+
+Using an entry safely when another thread wants to delete it.
+    The hashtable has a visit(uint64_t keysize, uint64_t* key,void(*visitor)(void*)) function. 
+    The visit() function will find the node with
+    associated key and will invoke visitor(node.data). During the functor execution, 
+    the bucket will be readlocked. This will ensure that no other thread can remove the entry while the
+    functor is called, therefore while the object is used. So it is safe to remove an object from the
+    hash table and delete it right after since removing the object from the list guarantees that no 
+    other thread is using it.
+
+remove and delete object with specific PID scan_and_remove
+    visit all nodes
+        writelock the bucket
+        invoke functor that will evaluate PID, release mem and return true/false
+        if returned true, remove node.
+        release writelock
 

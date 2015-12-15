@@ -95,7 +95,6 @@ struct block_cache_entry* getOrCreateCacheEntry(unsigned char dev, unsigned long
 
 }
 
-
 // This will return an entry that is pending read. 
 struct block_cache_entry* getFirstPendingReadCacheEntry(unsigned char dev)
 {

@@ -51,6 +51,18 @@ void addItem(hashtable* ht, int val,char* key)
     printf("hash for item: %x (%x %x)\r\n",gethash(ht,t),t->node.key, t->key);
 }
 
+bool clean_visitor(void* data, void* meta)
+{
+    test* t = (test*)data;
+    uint64_t id = *((uint64_t*)meta);
+    if (t->val >= id)
+    {
+        return true;
+    }
+    return false;
+}
+
+
 int main(int argc, char** argv)
 {
     uint64_t size = hashtable_getrequiredsize(KEY_SIZE);
@@ -100,5 +112,23 @@ int main(int argc, char** argv)
     hashtable_remove(ht,1,"00000003");
     if (ht->buckets[ht->hash_function(ht,1,"00000001")].node != 0) printf("ERROR %i\r\n",__LINE__);
 
+    addItem(ht,3,"00000003");
+    addItem(ht,4,"00000004");
+    uint64_t tval = 3;
+    hashtable_scan_and_clean(ht, &clean_visitor, &tval);
+    if (((test*)hashtable_get(ht,1,"00000001")) != 0) printf("ERROR %i\r\n",__LINE__);
+    if (((test*)hashtable_get(ht,1,"00000002")) != 0) printf("ERROR %i\r\n",__LINE__);
+    if (((test*)hashtable_get(ht,1,"00000003")) != 0) printf("ERROR %i\r\n",__LINE__);
+    if (((test*)hashtable_get(ht,1,"00000004")) != 0) printf("ERROR %i\r\n",__LINE__);
+
+    addItem(ht,1,"00000001");
+    addItem(ht,2,"00000002");
+    addItem(ht,3,"00000003");
+    addItem(ht,4,"00000004");
+    hashtable_scan_and_clean(ht, &clean_visitor, &tval);
+    if (((test*)hashtable_get(ht,1,"00000001")) == 0) printf("ERROR %i\r\n",__LINE__);
+    if (((test*)hashtable_get(ht,1,"00000002")) == 0) printf("ERROR %i\r\n",__LINE__);
+    if (((test*)hashtable_get(ht,1,"00000003")) != 0) printf("ERROR %i\r\n",__LINE__);
+    if (((test*)hashtable_get(ht,1,"00000004")) != 0) printf("ERROR %i\r\n",__LINE__);
 
 }
