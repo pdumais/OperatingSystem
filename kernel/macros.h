@@ -4,18 +4,6 @@
 #define META_ADDRESS_PAGE_TABLE_OFFSET (((((META_VIRTUAL_ADDRESS-KERNEL_RESERVED_END))>>12)<<3))
 #define CODE_ADDRESS_PAGE_TABLE_OFFSET (((((THREAD_CODE_START-KERNEL_RESERVED_END))>>12)<<3))
 #define STALL() 1337: hlt; jmp 1337b;
-#define COUNT_ONES(regx,regy) push %rcx; \
-    xor regy,regy; \
-    1337:; \
-    cmp $0,regx; \
-    jz  1338f; \
-    inc regy; \
-    mov regx,%rcx; \
-    dec %rcx; \
-    and %rcx,regx; \
-    jmp 1337b; \
-    1338:; \
-    pop  %rcx
 
 #define PUSHAEXCEPTRAX  push    %rdi; \
     push    %rbx; \

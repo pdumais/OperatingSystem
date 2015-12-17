@@ -525,8 +525,8 @@ startAllCPUs:
     jz      cantStartAllCPUs
     mov     %eax, APIC_REG_INTERRUPTCOMMANDLOW(%rdi)
     WAIT(100000000) //1 billioon loop should take more than 10ms on a 4ghz CPU
-    mov     STARTEDCPUS,%rbx
-    COUNT_ONES(%rbx,%rdx)
+
+    popcnt  STARTEDCPUS,%rdx
     cmp     CPUCOUNT,%rdx
     jnz      1b
 
@@ -1020,8 +1020,7 @@ sendIPI:
 
     // 4) Set the number of CPUS we are targeting. That would be the cpuCount
     //    minus ourself
-    movq        STARTEDCPUS,%rax
-    COUNT_ONES(%rax,%rdx)
+    popcnt      STARTEDCPUS,%rdx
     dec         %rdx
     mov         %dl,1(%rdi)
 

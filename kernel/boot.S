@@ -156,7 +156,7 @@ ltrlock: .quad 0
 enableAVX:
     mov     %cr0,%rax
     or      $0b10,%rax
-    and     $0xFFFFFFFFFFFFFFFD,%rax
+//    and     $0xFFFFFFFFFFFFFFFD,%rax
     mov     %rax,%cr0
 
     mov     %cr4,%rax

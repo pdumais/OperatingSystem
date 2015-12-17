@@ -1,4 +1,4 @@
-    optimization:
+hash optimization:
         compile with optimization
         optimize hash function
         optimize mem references (as less redirection as possible)
