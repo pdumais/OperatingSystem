@@ -327,9 +327,10 @@ deviceNotAvailableHandler:
     push    %rdi
 
     // clear the TS flag
-    mov     %cr0,%rax
-    and     $0xFFFFFFFFFFFFFFF7,%rax
-    mov     %rax,%cr0
+    clts
+    //mov     %cr0,%rax
+    //and     $0xFFFFFFFFFFFFFFF7,%rax
+    //mov     %rax,%cr0
 
     // get previous save ares
     mov     lastMediaSaveArea,%rbx

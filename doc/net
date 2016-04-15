@@ -1,21 +1,41 @@
+# Network card drivers
+The netcard abstration layer is contained in netcard.c. 
+
+When the OS boots, net_init() is called. This function
+iterates through the PCI bus's devices to find all devices
+that match one of the OS's netcard drivers. For each netcard
+found, a struct NetworkCard is instanciated. The structure
+contains several function pointers that are initialized with 
+the matching driver's functions. For example, NetworkCard::receive
+would be set to &rtl8139_receive if the netcard was a rtl8139.
+Each of these NetworkCard instances will be refered to as the
+"netcard implementation"
+
+Only the rtl8139 driver is implemented right now.
+
+When a netcard IRQ occurs, a softIRQ is scheduled. When the
+softIRQ handler is invoked, it calls net_process(). net_process()
+iterates through all netcard that was discovered during boot.
+It then checks if data is available and forwards the the data
+up to the TCP/IP stack if the data is an IP packet, or to the
+ICMP stack if the packet is of the ICMP type.
+
 #TCP/IP stack
-
 ##Receiving data
-The netcard abstraction's net_process() function, invoked
-by the softirq, iterates through each netcards and distributes
-frames to the ICMP or IP handlers.
-
-The ICMP handler responds immediately to ping requests. The IP
-handler forwards the message to the TCP or UDP handlers. The
-UDP handler is not implemented yet. The TCP handler forwards
-segments to active sockets by finding the socket listening
-to the port and ip of the message. The message is added in
-the socket's queue.
+The ICMP handler responds immediately to ping requests. Therefore
+the ICMP response is sent from the softIRQ thread. This allows
+consistent RTT. The IP handler forwards the message to the TCP or 
+UDP handlers. The UDP handler is not implemented yet. The TCP 
+handler forwards segments to active sockets by finding the socket 
+listening to the port and ip of the message. This is done by by
+finding the socket instance within a hash list. The message is added 
+in the socket's queue. The user thread is then responsible for 
+dequeuing those messages.
 
 ##Sending data
 The netcard abstraction's net_send() function locks
 the netcard implementation's send spinlock. This way, only
-one thread can can send one one given netcard at the same time.
+one thread can send to one given netcard at the same time.
 
 net_send() takes an interface index as destination parameter.
 ip_send takes an ip address as destination parameter. ip_send
@@ -29,17 +49,22 @@ not at all but never partly.
 ip_send() will send a packet of maximum 65536 bytes. It will do ip fragmentation
 in order to send frames of appropriate size.
 
-tcp_send() will send 1 segment of maximum 64k.
+tcp_send() will send 1 segment of maximum 64k. This means that the underlying 
+ip_send() can end up calling net_send several times. 
 
 ###Problem
-if net_send() returns 0, because of HW buffer overflow, then ip_send will return the 
+There is actually a design flaw with tcp_send right now. Sending data on a socket 
+will end up in netcard_send being called from the user thread. The call is thus blocking. 
+
+Also, If net_send() returns 0, because of HW buffer overflow, then ip_send will return the 
 number of bytes sent. But tcp_send should not attempt to send the rest of the data
 because the IP protocol expects the rest of the packet.
 
 #Blocking operations
 All socket operations such as connect, accept, send, receive and close are 
 non-blocking. This implies that the lower-level layer operations are non-blocking
-also. There is currently one exception to this that needs to be solved.
+also. There are some exceptions to this, but only because there are design flaws
+that need to be addressed.
 
 ##Problem:
 Upon connecting a socket, ARP discovery and DNS resolution might need to be 
@@ -56,8 +81,9 @@ At any time, only two threads can access the tcp/ip stack: The softIRQ thread,
 for processing incomming frames, and the owner of the socket. If multiple
 threads want to share socket usage, they will have to implement their own
 locking mechanism. The tcp/ip stack will only guarantee thread safety between
-the two threads mentioned above. This behaviour is similar to other operating 
-systems. Sockets should be used by one thread only in a user application.
+the two threads mentioned above. Sockets should be used by one thread only in 
+a user application. Two different sockets can be used by two different threads
+at the same time though.
 
 ##net_send() locking
 net_send() is used by the softIRQ context and user threads. Since
@@ -95,8 +121,11 @@ Solution
 Make sure that only one consumer at a time can append/remove from the socket list.
 
 Solution
-??????
+The hash list is thread safe so it should already be handled correctly.
+But more tests need to be done because there is a little more to it than
+just accessing the hash list.
       
+
 ###Problem 3
 Socket backlog list might get accessed by softIRQ and owning thread
 

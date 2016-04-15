@@ -30,6 +30,7 @@ struct PCIDevice
     unsigned char   function;
     unsigned char   ioapicPin;
     unsigned char   ioapicID;
+    unsigned short   subsystemID;
 }__attribute((packed))__;
 
 
@@ -84,6 +85,8 @@ unsigned long validateDevice(unsigned long bus, unsigned long device, unsigned c
     unsigned int data = getPCIData(bus,device,function,0);
     unsigned short vendorID = data & 0xFFFF;
     unsigned short devID = (data>>16);
+    data = getPCIData(bus,device,function,0x2C);
+    unsigned short subID = data>>16;
     if (vendorID != 0xFFFF)
     {
         data = getPCIData(bus,device,function,0x0C);
@@ -102,6 +105,7 @@ unsigned long validateDevice(unsigned long bus, unsigned long device, unsigned c
         pciDevices[pciDeviceIndex].bars[3] = getPCIData(bus,device,function,0x1C);
         pciDevices[pciDeviceIndex].bars[4] = getPCIData(bus,device,function,0x20);
         pciDevices[pciDeviceIndex].bars[5] = getPCIData(bus,device,function,0x24);
+        pciDevices[pciDeviceIndex].subsystemID = subID,
 
         data = getPCIData(bus,device,function,0x08);
         pciDevices[pciDeviceIndex].classCode = (data>>24);
@@ -172,7 +176,7 @@ unsigned int pci_getDevice(unsigned long vendor, unsigned long device)
     return 0xFFFFFFFF;
 }
 
-unsigned int pci_getDeviceByClass(unsigned char class, unsigned char index, unsigned long* vendor, unsigned long* device)
+unsigned int pci_getDeviceByClass(unsigned char class, unsigned char index, unsigned long* vendor, unsigned long* device, unsigned short* subsystem)
 {
     unsigned long i;
     for (i=0;i<pciDeviceIndex;i++)
@@ -183,6 +187,7 @@ unsigned int pci_getDeviceByClass(unsigned char class, unsigned char index, unsi
             {   
                 *vendor = pciDevices[i].vendorID;
                 *device = pciDevices[i].deviceID;
+                *subsystem = pciDevices[i].subsystemID;
                 return getAddress(&pciDevices[i]);
             }
             index--;

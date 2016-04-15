@@ -9,19 +9,28 @@
 #define RECV_BUFFER_SIZE 256   // that's 256 buffers of 2k. 
 
 extern void ip_init();
+
 extern void* initrtl8139(unsigned int addr, char* buffer, unsigned int buffserSize);
 extern void rtl8139_start();
 extern unsigned long rtl8139_getMACAddress();
 extern unsigned long rtl8139_receive(unsigned char** buffer,struct NetworkCard*);
 extern void rtl8139_recvProcessed(struct NetworkCard*);
 extern unsigned long rtl8139_send(struct NetworkBuffer *,struct NetworkCard*);
+
+extern void* initvirtionet(unsigned int addr, char* buffer, unsigned int buffserSize);
+extern void virtionet_start();
+extern unsigned long virtionet_getMACAddress();
+extern unsigned long virtionet_receive(unsigned char** buffer,struct NetworkCard*);
+extern void virtionet_recvProcessed(struct NetworkCard*);
+extern unsigned long virtionet_send(struct NetworkBuffer *,struct NetworkCard*);
+
 extern void spinLock_softirq(spinlock_softirq_lock*);
 extern void spinUnlock_softirq(spinlock_softirq_lock*);
 extern void arp_process(struct Layer2Payload* payload);
 extern void arp_learn(struct Layer2Payload* payload);
 extern void yield();
 extern char* kernelAllocPages();
-extern unsigned int pci_getDeviceByClass(unsigned char class, unsigned char index, unsigned long* vendor, unsigned long* device);
+extern unsigned int pci_getDeviceByClass(unsigned char class, unsigned char index, unsigned long* vendor, unsigned long* device, unsigned short* sub);
 extern void ip_routing_addRoute(unsigned int network, unsigned int netmask, unsigned int gateway, unsigned char metric, unsigned long interface);
 extern void tcp_init();
 
@@ -57,9 +66,11 @@ void net_init()
     for (i=0;i<32;i++)
     {
         unsigned long device,vendor;
-        unsigned int addr = pci_getDeviceByClass(2,i,&vendor,&device);
+        unsigned short subsystem;
+        unsigned int addr = pci_getDeviceByClass(2,i,&vendor,&device,&subsystem);
         if (addr==0xFFFFFFFF) break;
 
+        //TODO: this value should be fetched by the driver
         recvBuffer = kernelAllocPages(128);
 
         struct NetworkCard* netcard = &networkCards[i];
@@ -71,6 +82,16 @@ void net_init()
             netcard->receive = &rtl8139_receive;
             netcard->recvProcessed = &rtl8139_recvProcessed;
             netcard->send = &rtl8139_send;
+            netcard->deviceInfo = (void*)netcard->init(addr,recvBuffer,RECV_BUFFER_SIZE);
+        }
+        if (vendor == 0x1AF4 && (device >= 0x1000 && device <= 0x103F))
+        {
+            netcard->init = &initvirtionet;
+            netcard->start = &virtionet_start;
+            netcard->getMACAddress = &virtionet_getMACAddress;
+            netcard->receive = &virtionet_receive;
+            netcard->recvProcessed = &virtionet_recvProcessed;
+            netcard->send = &virtionet_send;
             netcard->deviceInfo = (void*)netcard->init(addr,recvBuffer,RECV_BUFFER_SIZE);
         }
 
