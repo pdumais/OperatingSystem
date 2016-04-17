@@ -1,9 +1,12 @@
 - virtio network card driver
-    rx buffers are set. Not enable interrupts and see if handler is called.
-    retrieve a buffer when receiving
     send a buffer
+        create buffers in queue
+        add header and packet in queue
+        receive interrupt when sent successfully and release the used buffer.
+    retrieve a buffer when receiving
+    put init/negotiate/qsetup/driver ok in virtio.c
 
-
+- virtio block device
 - sockets still needs a lot of improvements (doc/net)
     - fsm for tcp ?
 

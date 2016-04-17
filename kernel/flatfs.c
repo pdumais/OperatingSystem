@@ -1,5 +1,7 @@
 #include "flatfs.h"
 #include "block_cache.h"
+#include "display.h"
+
 extern void memcpy64(char* source, char* destination, uint64_t size);
 
 void flatfs_system_handle_destructor(system_handle* h);

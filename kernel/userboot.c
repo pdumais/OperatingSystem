@@ -140,7 +140,6 @@ uint64_t loadProcess(char* name, bool createNewConsole)
     return upi.psi.pml4;
 }
 
-//TODO: right now, we load apps from raw disk, but we should support a file system
 void loadUserApplications(uint64_t device)
 {
     unsigned int i,n;
@@ -153,7 +152,6 @@ void loadUserApplications(uint64_t device)
         pf("Bad device name\r\n");
         return;
     }
-
     fname[0]='0';
     fname[1]=0x30+device;  
     fname[2]=':';
