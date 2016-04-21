@@ -1,10 +1,6 @@
 - virtio network card driver
-    send a buffer
-        create buffers in queue
-        add header and packet in queue
-        receive interrupt when sent successfully and release the used buffer.
-    retrieve a buffer when receiving
-    put init/negotiate/qsetup/driver ok in virtio.c
+    when receiving a buffer, the system crashes
+    try to ping
 
 - virtio block device
 - sockets still needs a lot of improvements (doc/net)
@@ -25,6 +21,7 @@
     - should get pushed on stack?
     - or just the pointer to string passed? but that new process
       might not have access right to mirrorspace
+- how to make thread sleep and wakeup upon HW event or mutex unlock?
 - serial port: can feed console like keyboard, could make a separate flush function
 - Possible bugs:
     -   If a process has two virt page that maps to the same phys and the thread dies,

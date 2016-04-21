@@ -172,7 +172,7 @@ void net_process()
                 if (payload.protocol == 0x0081) // vlan tag
                 {
                     unsigned short vlan = *((unsigned short*)&buf[14]);
-                        payload.vlan = vlan; // warning: this is also big-endian 
+                    payload.vlan = vlan; // warning: this is also big-endian 
                     payload.protocol = *((unsigned short*)&buf[16]);
                     payload.data = (unsigned char*)&buf[18];
                 }
@@ -200,7 +200,6 @@ void net_process()
 
 unsigned long net_send(unsigned char interface, unsigned long destinationMAC, unsigned short vlan, unsigned short ethertype, struct NetworkBuffer* netbuf)
 {
-
     struct NetworkCard *netcard = &networkCards[interface]; 
     unsigned long ret;
     unsigned char buf[20];

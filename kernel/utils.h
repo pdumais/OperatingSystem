@@ -4,6 +4,7 @@
 #ifndef UNIT_TEST
 
 #define C_BREAKPOINT() __asm("int $3");
+#define C_BREAKPOINT_VAR(v1,v2,v3,v4) asm volatile ("int $3" : :"a"(v1),"b"(v2),"c"(v3),"d"(v4));
 #define OUTPORTB(val,port) asm volatile( "outb %0, %1" : : "a"((unsigned char)(val)), "Nd"((unsigned short)(port)) );
 #define OUTPORTW(val,port) asm volatile( "outw %0, %1" : : "a"((unsigned short)(val)), "Nd"((unsigned short)(port)) );
 #define OUTPORTL(val,port) asm volatile( "outl %0, %1" : : "a"((unsigned int)(val)), "Nd"((unsigned short)(port)) );

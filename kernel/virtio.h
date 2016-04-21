@@ -45,7 +45,7 @@
 #define VIRTIO_NET_HDR_GSO_TCPV6       4 
 #define VIRTIO_NET_HDR_GSO_ECN         0x80 
 
-#define PAGE_COUNT(x) (((x+0xFFF)&(~0xFFF))>>12)
+#define PAGE_COUNT(x) ((x+0xFFF)>>12) 
 #define DISABLE_FEATURE(v,feature) v &= ~(1<<feature)
 #define ENABLE_FEATURE(v,feature) v |= (1<<feature)
 #define HAS_FEATURE(v,feature) (v & (1<<feature))
@@ -58,7 +58,6 @@ typedef struct
     u16 gso_size;
     u16 checksum_start;
     u16 checksum_offset;
-    u16 buffer_count;
 } net_header;
 
 typedef struct
@@ -71,9 +70,23 @@ typedef struct
 
 typedef struct
 {
+    u16 flags;
+    u16 index;
+    u16 rings[];
+} virtio_available;
+
+typedef struct
+{
     u32 index;
     u32 length;
-} used_ring;
+} virtio_used_item;
+
+typedef struct
+{
+    u16 flags;
+    u16 index;
+    virtio_used_item rings[];
+} virtio_used;
 
 typedef struct
 {
@@ -81,38 +94,37 @@ typedef struct
     union
     {
         queue_buffer* buffers;
-        void* baseAddress;
+        u64 baseAddress;
     };
-    u16* available_flags;
-    u16* available_index;
-    u16* available_rings;
-    u16* available_event_idx;
-    u16* used_flags;
-    u16* used_index;
-    used_ring* used_rings;
-    u16* used_event_idx;
+    virtio_available* available;
+    virtio_used* used;
+    u16 last_used_index;
+    u16 last_available_index;
 } virt_queue;
 
 struct virtio_device_info
 {
-    unsigned char readIndex;
-    unsigned char writeIndex;
-    unsigned char currentTXDescriptor;
-    unsigned char transmittedDescriptor;
     unsigned int rxBufferSize;
     unsigned char* rxBuffer;
-
     unsigned int deviceAddress;
     unsigned short iobase;
     unsigned long memoryAddress;
     unsigned short irq;
     unsigned long macAddress;
-
     virt_queue queues[16];
 };
 
 
+typedef struct
+{
+    u32 index;
+    u64 address;
+    u32 length;
+} send_buffer;
+
 bool virtio_init(struct virtio_device_info* dev, void (*negotiate)(u32* features));
 bool virtio_queue_setup(struct virtio_device_info* dev, unsigned char index);
-bool virtio_send_buffer(virt_queue* vq, u8* data, u32 size);
-
+send_buffer virtio_get_send_buffer(virt_queue* vq, u32 size);
+void virtio_send_buffer_ready(struct virtio_device_info* dev, u16 queue_index, u16 index);
+void virtio_clean_used_buffers(struct virtio_device_info* dev, u16 queue_index);
+void virtio_set_next_receive_buffer_available(virt_queue* vq, u16 count);

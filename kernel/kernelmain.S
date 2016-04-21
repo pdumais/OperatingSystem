@@ -79,7 +79,7 @@ mainkernelthread:
     mov     $1,%rdx
     mov     $0,%rcx                  // Card 0
     call    net_setIPConfig
-    mov     $0xC0A8021C,%rdi        // 192.168.1.28
+    mov     $0xC0A8021C,%rdi        // 192.168.2.28
     mov     $0xFFFFFF00,%rsi        // 255.255.255.0
     mov     $1,%rdx
     mov     $1,%rcx                 // Card 1
@@ -88,8 +88,19 @@ mainkernelthread:
     mov     $0,%rsi
     call    net_setDefaultGateway
 
+
+
+
+
     mov     $1,%rdi
     call    loadUserApplications
+
+//TEST
+//mov     $0,%rdi
+//mov     $0x1B01A8C0,%rsi
+//mov     teststr,%rdx
+//mov     $10,%rcx  
+//call    ip_send 
 
 1:   
     call    manageConsoles
@@ -136,7 +147,7 @@ blockbuffer:
     .skip (5*512)
 
 mainkernelthread_end:
-teststr: .ASCIZ " \r\n"
+teststr: .ASCIZ "meow\r\n"
 
 
 // ====================== THIS IS A TEST THREAD

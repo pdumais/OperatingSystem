@@ -24,6 +24,7 @@ void arp_process(struct Layer2Payload* payload)
     {
         if (hwType==0x0100 && protocolType==0x0008)
         {
+//C_BREAKPOINT_VAR(targetIP,conf->ip,operation,0)
             if (operation==0x0100 && targetIP == conf->ip)
             {
                 unsigned char* buf = payload->data;
