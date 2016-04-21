@@ -7,6 +7,7 @@
 extern char* kernelAllocPages(unsigned int pageCount);
 extern void memclear64(char* destination, uint64_t size);
 extern void memcpy64(char* source, char* dest, unsigned long size);
+extern bool compare_and_swap(u64*,u64,u64);
 
 
 bool virtio_queue_setup(struct virtio_device_info* dev, unsigned char index)
@@ -89,17 +90,18 @@ send_buffer virtio_get_send_buffer(virt_queue* vq, u32 size)
     // loop through all virtio buffers, find one with size==0
     for (i = 0; i < vq->queue_size; i++)
     {
-        if (vq->buffers[i].length == 0)
+        if (compare_and_swap(&(vq->buffers[i].length),0,size))
         {
-            sb.address = MIRROR(vq->buffers[i].address);
-            sb.index = i;
-            vq->buffers[i].length = size;
             vq->buffers[i].flags =  0;
             vq->buffers[i].next = 0;
+            
+            sb.address = MIRROR(vq->buffers[i].address);
+            sb.index = i;
             return sb;
         }
     }
 
+    C_BREAKPOINT_VAR(0xDEADBEEF,0,0,0)
     sb.address = 0;
     return sb;
 }
@@ -114,6 +116,8 @@ void virtio_send_buffer_ready(struct virtio_device_info* dev, u16 queue_index, u
     u16 ring_index = (vq->available->index)%vq->queue_size;
 
     vq->available->rings[ring_index] = index;
+
+    //TODO: should do a  cmpxchg here. Could be called by 2 threads
     vq->available->index++;
     OUTPORTW(queue_index,dev->iobase+0x10);
 

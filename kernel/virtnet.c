@@ -42,7 +42,7 @@ unsigned long virtionet_getMACAddress(struct NetworkCard* netcard)
     return dev->macAddress;
 }
 
-void* initvirtionet(unsigned int deviceAddr, char* buffer, unsigned int bufferSize)
+void* initvirtionet(unsigned int deviceAddr)
 {
     unsigned int templ;
     unsigned short tempw;
@@ -81,8 +81,6 @@ void* initvirtionet(unsigned int deviceAddr, char* buffer, unsigned int bufferSi
         }
     }
 
-    devInfo->rxBuffer = (unsigned char*)buffer;
-    devInfo->rxBufferSize = bufferSize*2048;
     devInfo->irq = pci_getIOAPICIRQ(devInfo->deviceAddress);
     registerIRQ(&handler,devInfo->irq);
     pci_enableBusMastering(devInfo->deviceAddress);
@@ -111,6 +109,7 @@ void virtionet_start(struct NetworkCard* netcard)
 {
     int i;
     struct virtio_device_info* dev = (struct virtio_device_info*)netcard->deviceInfo;
+    char *buffer;
 
     virtio_init(dev,&virtionet_negotiate);
 
@@ -120,17 +119,11 @@ void virtionet_start(struct NetworkCard* netcard)
         C_BREAKPOINT() //TODO: handle this instead of #BP
     }
 
-    // check if the buffer passed by netcard is big enough
-    if (dev->queues[0].queue_size*FRAME_SIZE > dev->rxBufferSize)
-    {
-        // buffer is currently hardcoded to 128*4096
-        C_BREAKPOINT() //TODO: handle this instead of #BP
-    }
-
+    buffer = (unsigned char*)kernelAllocPages(128);
     // Queues 0 is the rx queue. That's always the case for virtnet
     for (i = 0; i < dev->queues[0].queue_size; i++)
     {
-        dev->queues[0].buffers[i].address = UNMIRROR((u64)&dev->rxBuffer[FRAME_SIZE*i]);
+        dev->queues[0].buffers[i].address = UNMIRROR((u64)&buffer[FRAME_SIZE*i]);
         dev->queues[0].buffers[i].length = FRAME_SIZE;
         dev->queues[0].buffers[i].flags = VIRTIO_DESC_FLAG_WRITE_ONLY;
     }
@@ -139,10 +132,10 @@ void virtionet_start(struct NetworkCard* netcard)
     virtio_set_next_receive_buffer_available(&dev->queues[0],16);
 
     // setup the send buffers
-    unsigned char* send_buffer = kernelAllocPages(PAGE_COUNT(FRAME_SIZE*dev->queues[1].queue_size));
+    buffer = kernelAllocPages(PAGE_COUNT(FRAME_SIZE*dev->queues[1].queue_size));
     for (i = 0; i < dev->queues[1].queue_size; i++)
     {
-        dev->queues[1].buffers[i].address = UNMIRROR((u64)&send_buffer[FRAME_SIZE*i]);
+        dev->queues[1].buffers[i].address = UNMIRROR((u64)&buffer[FRAME_SIZE*i]);
         dev->queues[1].buffers[i].length = 0;
     }
 
@@ -205,6 +198,7 @@ unsigned long virtionet_send(struct NetworkBuffer *netbuf, struct NetworkCard* n
 
     unsigned char *buf = sb.address;
     net_header* h = (net_header*)buf;
+    //TODO: must reset whole header
     h->flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
     h->gso_type = 0;
     h->checksum_start = 0;   

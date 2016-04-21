@@ -1,8 +1,21 @@
-- virtio network card driver
-    when receiving a buffer, the system crashes
-    try to ping
+- virtio network card driver.
+    - compare_and_swap must be 32 bit
+    - must create 2 buffers for header and data
+        - set the "next" field
+        - will need to increase "available" by 2. and used also
+    - document it
+        queues
+            for sending: put buf in avail, increase index, check used
+            for receiving: put empty buf (with size) in avail etc..
+        initializing
+            negotiation
+        sending
+        receiving and interrupts
 
 - virtio block device
+    add an abastraction layer between block cache and ATA.
+        it would load virtio and ata. It would decide where to route devices 0,1,2,3,4,5 etc...
+
 - sockets still needs a lot of improvements (doc/net)
     - fsm for tcp ?
 

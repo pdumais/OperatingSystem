@@ -41,7 +41,7 @@ struct NetworkCard
     struct NetworkConfig ownNetworkConfig;
     void* deviceInfo;
 
-    void* (*init)(unsigned int, char* buffer, unsigned int bufferSize);
+    void* (*init)(unsigned int);
     void (*start)(struct NetworkCard*);
     unsigned long (*getMACAddress)(struct NetworkCard*);
     unsigned long (*receive)(unsigned char** buffer, struct NetworkCard*);

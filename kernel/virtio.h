@@ -104,8 +104,6 @@ typedef struct
 
 struct virtio_device_info
 {
-    unsigned int rxBufferSize;
-    unsigned char* rxBuffer;
     unsigned int deviceAddress;
     unsigned short iobase;
     unsigned long memoryAddress;

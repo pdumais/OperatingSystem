@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "netcard.h"
 
+#define RECV_BUFFER_SIZE 256 // that's 256 buffers of 2k. 
 #define RX_BUFFER_SIZE 8192 
 
 extern unsigned int pci_getBar(unsigned int dev,unsigned char bar);
@@ -11,7 +12,7 @@ extern void pci_enableBusMastering(unsigned int dev);
 extern void registerIRQ(void* handler, unsigned long irq);
 extern void setSoftIRQ(unsigned long);
 extern unsigned short pci_getIOAPICIRQ(unsigned int dev);
-
+extern char* kernelAllocPages(unsigned int pageCount);
 
 /*
 http://linuxgazette.net/156/jangir.html
@@ -131,7 +132,7 @@ unsigned long rtl8139_getMACAddress(struct NetworkCard* netcard)
     return dev->macAddress;
 }
 
-void* initrtl8139(unsigned int deviceAddr, char* buffer, unsigned int bufferSize)
+void* initrtl8139(unsigned int deviceAddr)
 {
     unsigned int templ;
     unsigned short tempw;
@@ -150,8 +151,8 @@ void* initrtl8139(unsigned int deviceAddr, char* buffer, unsigned int bufferSize
     if (devInfo==0) return 0;
 
 
-    devInfo->rxBuffers = buffer;
-    devInfo->rxBufferCount = bufferSize;
+    devInfo->rxBuffers = kernelAllocPages(128);
+    devInfo->rxBufferCount = RECV_BUFFER_SIZE;
 
     devInfo->deviceAddress = deviceAddr;
     if (devInfo->deviceAddress == 0xFFFFFFFF)

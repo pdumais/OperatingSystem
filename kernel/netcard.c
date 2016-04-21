@@ -6,7 +6,6 @@
 
 //tcpdump -i tap3 -nn -vvv -XX arp
 
-#define RECV_BUFFER_SIZE 256   // that's 256 buffers of 2k. 
 
 extern void ip_init();
 
@@ -61,7 +60,6 @@ unsigned char net_getInterfaceIndex(unsigned int ip)
 
 void net_init()
 {
-    char* recvBuffer;
     unsigned char i;
     for (i=0;i<32;i++)
     {
@@ -69,9 +67,6 @@ void net_init()
         unsigned short subsystem;
         unsigned int addr = pci_getDeviceByClass(2,i,&vendor,&device,&subsystem);
         if (addr==0xFFFFFFFF) break;
-
-        //TODO: this value should be fetched by the driver
-        recvBuffer = kernelAllocPages(128);
 
         struct NetworkCard* netcard = &networkCards[i];
         if (vendor == 0x10EC && device == 0x8139)
@@ -82,7 +77,7 @@ void net_init()
             netcard->receive = &rtl8139_receive;
             netcard->recvProcessed = &rtl8139_recvProcessed;
             netcard->send = &rtl8139_send;
-            netcard->deviceInfo = (void*)netcard->init(addr,recvBuffer,RECV_BUFFER_SIZE);
+            netcard->deviceInfo = (void*)netcard->init(addr);
         }
         if (vendor == 0x1AF4 && (device >= 0x1000 && device <= 0x103F))
         {
@@ -92,7 +87,7 @@ void net_init()
             netcard->receive = &virtionet_receive;
             netcard->recvProcessed = &virtionet_recvProcessed;
             netcard->send = &virtionet_send;
-            netcard->deviceInfo = (void*)netcard->init(addr,recvBuffer,RECV_BUFFER_SIZE);
+            netcard->deviceInfo = (void*)netcard->init(addr);
         }
 
     }
