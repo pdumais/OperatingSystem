@@ -118,11 +118,15 @@ typedef struct
     u32 index;
     u64 address;
     u32 length;
-} send_buffer;
+} available_buffer;
+
+typedef struct
+{
+    u8* buffer;
+    u64 size;
+} buffer_info;
 
 bool virtio_init(struct virtio_device_info* dev, void (*negotiate)(u32* features));
 bool virtio_queue_setup(struct virtio_device_info* dev, unsigned char index);
-send_buffer virtio_get_send_buffer(virt_queue* vq, u32 size);
-void virtio_send_buffer_ready(struct virtio_device_info* dev, u16 queue_index, u16 index);
 void virtio_clean_used_buffers(struct virtio_device_info* dev, u16 queue_index);
-void virtio_set_next_receive_buffer_available(virt_queue* vq, u16 count);
+void virtio_send_buffer(struct virtio_device_info* dev, virt_queue* vq, buffer_info b[], u64 count);

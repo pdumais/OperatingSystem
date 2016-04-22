@@ -7,7 +7,6 @@
 extern char* kernelAllocPages(unsigned int pageCount);
 extern void memclear64(char* destination, uint64_t size);
 extern void memcpy64(char* source, char* dest, unsigned long size);
-extern bool compare_and_swap(u64*,u64,u64);
 
 
 bool virtio_queue_setup(struct virtio_device_info* dev, unsigned char index)
@@ -76,57 +75,6 @@ bool virtio_init(struct virtio_device_info* dev, void (*negotiate)(u32* features
     OUTPORTB(c,dev->iobase+0x12);
 }
 
-send_buffer virtio_get_send_buffer(virt_queue* vq, u32 size)
-{
-    // We will find an empty buffer by iterating through the buffers until
-    // we find one with size = 0. We will then set the size accordingly. This
-    // will effectively reserve the buffer. There should be a lock (cmpxchg)
-    // when checking for size ==0 and then setting it. 
-
-    //TODO: cmpxchg when reading vq->buffers[i].length and then setting it)
-
-    int i;
-    send_buffer sb;
-    // loop through all virtio buffers, find one with size==0
-    for (i = 0; i < vq->queue_size; i++)
-    {
-        if (compare_and_swap(&(vq->buffers[i].length),0,size))
-        {
-            vq->buffers[i].flags =  0;
-            vq->buffers[i].next = 0;
-            
-            sb.address = MIRROR(vq->buffers[i].address);
-            sb.index = i;
-            return sb;
-        }
-    }
-
-    C_BREAKPOINT_VAR(0xDEADBEEF,0,0,0)
-    sb.address = 0;
-    return sb;
-}
-
-void virtio_send_buffer_ready(struct virtio_device_info* dev, u16 queue_index, u16 index)
-{
-    virt_queue* vq = &dev->queues[queue_index];
-
-    // suppress interrupts. We dont want interrupts when buffer is done sending
-    // because we will handle this in here later
-    vq->available->flags = 1; 
-    u16 ring_index = (vq->available->index)%vq->queue_size;
-
-    vq->available->rings[ring_index] = index;
-
-    //TODO: should do a  cmpxchg here. Could be called by 2 threads
-    vq->available->index++;
-    OUTPORTW(queue_index,dev->iobase+0x10);
-
-    // now, we will clear previously used buffers, it any. We do this here instead of in the interrupt
-    // context. It adds latency to the calling thread instead of adding latency to any random thread
-    // where the interrupt would be called from.
-    virtio_clean_used_buffers(dev, 1);
-}
-
 void virtio_clean_used_buffers(struct virtio_device_info* dev, u16 queue_index)
 {
     virt_queue* vq = &dev->queues[queue_index];
@@ -146,7 +94,36 @@ void virtio_clean_used_buffers(struct virtio_device_info* dev, u16 queue_index)
     vq->last_used_index = index;
 }
 
-void virtio_set_next_receive_buffer_available(virt_queue* vq, u16 count)
+void virtio_send_buffer(struct virtio_device_info* dev, virt_queue* vq, buffer_info b[], u64 count)
 {
-    vq->available->index += count;
+    u32 virtio_size = 0;
+    u64 i;
+
+    //TODO: we should lock the entire function
+    u16 index = vq->available->index % vq->queue_size;
+    u16 buffer_index = vq->available->rings[index];
+
+    if (b != 0)
+    {
+        unsigned char *buf = MIRROR((unsigned char*)(vq->buffers[buffer_index].address));
+        unsigned char *buf2 = buf;
+
+        for (i = 0; i < count; i++)
+        {
+            buffer_info* bi = &b[i];
+            virtio_size += bi->size;
+            memcpy64(bi->buffer,buf2,bi->size);
+            buf2+=bi->size;
+        }
+
+        vq->buffers[buffer_index].length = virtio_size;
+    }
+
+    vq->available->index++;
+    OUTPORTW(1,dev->iobase+0x10);
+
+    // now, we will clear previously used buffers, it any. We do this here instead of in the interrupt
+    // context. It adds latency to the calling thread instead of adding latency to any random thread
+    // where the interrupt would be called from.
+    virtio_clean_used_buffers(dev, 1);
 }

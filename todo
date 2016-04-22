@@ -1,8 +1,10 @@
+
 - virtio network card driver.
-    - compare_and_swap must be 32 bit
     - must create 2 buffers for header and data
-        - set the "next" field
-        - will need to increase "available" by 2. and used also
+        - on buffer init: allocate each buffers in two parts and set "next" in driver init
+        - init of available: only every 2 buffers. repeat twice
+        - when sending buffer, must use two buffers
+        - clean: take care of both buffers
     - document it
         queues
             for sending: put buf in avail, increase index, check used
@@ -13,8 +15,10 @@
         receiving and interrupts
 
 - virtio block device
-    add an abastraction layer between block cache and ATA.
-        it would load virtio and ata. It would decide where to route devices 0,1,2,3,4,5 etc...
+    - add an abastraction layer between block cache and ATA.
+        - it would load virtio and ata. It would decide where to route devices 0,1,2,3,4,5 etc...
+    - detect virtio 
+    - implement init,read,write,interrupt notification
 
 - sockets still needs a lot of improvements (doc/net)
     - fsm for tcp ?
