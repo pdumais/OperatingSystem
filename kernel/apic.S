@@ -442,7 +442,12 @@ ioApicEntry:
     mov     %edx,(%r10)       // Store the IO APIC ID in IOAPICINFO struct
     shr     $32,%rbx        
     mov     %ebx,8(%r10)      // Store the IO APIC address in IOAPICINFO struct
-    incq    IOAPICCOUNT       // increase IOAPIC count
+    
+    cmp     $0,IOAPICCOUNT
+    je      1f  
+    int     $3                // We don't support more than 1 IOAPIC yet
+
+1:  incq    IOAPICCOUNT       // increase IOAPIC count
     add     $16,%r10
     jmp     entryLoop
 
@@ -830,6 +835,7 @@ registerIRQ:
     push    %rdi
     push    %rax
     push    %rcx
+    push    %r8
 
     // Add handler in handlers table. There are 16 handler slot per IRQ
     // each entry is 64bit so first slot = IOAPICHANDLERS+(irq*(8*16))
@@ -837,17 +843,33 @@ registerIRQ:
     shl     $7,%rax                         // *8*16
     add     $IOAPICHANDLERS,%rax
     mov     $16,%rcx
+    mov     %rax,%r8    
+
+    // First check if handler already registered
+1:  cmp     %rdi,(%r8)
+    je      exitRegisterIRQ
+    add     $8,%r8
+    loop    1b
+
+    mov     $16,%rcx
 1:  cmp     $0,(%rax)
     jz      2f    
     add     $8,%rax
     loop    1b
+    int     $3                              // table was full
     jmp     exitRegisterIRQ
 2:  mov     %rdi,(%rax)
+    cmp     $16,%rcx
+    jne     exitRegisterIRQ                 //if rcx==0, it means it is the first
+                                            // entry we register. So setup the 
+                                            // ioapic. Otherwise, it was already 
+                                            // done before
     mov     %rsi,%rdi
     add     $32,%rsi
     call    ioAPICRedirect
 
 exitRegisterIRQ:
+    pop     %r8
     pop     %rcx
     pop     %rax
     pop     %rdi
@@ -1107,7 +1129,6 @@ getIPIMessageError:
 baseIPIHandler:
     PUSHAEXCEPTRAX              // rax was saved before going here
     push        %rax
-
 
     // rax was set to vector number before going here
     call        getIPIMessage

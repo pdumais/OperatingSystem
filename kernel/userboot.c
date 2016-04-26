@@ -3,6 +3,7 @@
 #include "userprocess.h"
 #include "vfs.h"
 #include "display.h"
+#include "utils.h"
 
 // This MUST be a multiple of 4096
 //TODO: we should determine the count dynamically. This will be easy when using FAT32
@@ -146,7 +147,7 @@ void loadUserApplications(uint64_t device)
     uint64_t param=0;
     char bootscript[512]; 
     char fname[512];
-    
+
     if (device >9)
     {
         pf("Bad device name\r\n");
@@ -164,7 +165,7 @@ void loadUserApplications(uint64_t device)
         return;
     }
 
-    block_cache_read(1,device,bootscript,1);    // read bootscript
+//    block_cache_read(1,device,bootscript,1);    // read bootscript
     fread(f,512,bootscript);
     fclose(f);
 

@@ -27,10 +27,14 @@ static void handler()
 {
     u8 deviceIndex;
     u8 v;
+
+    // for each device that has data ready, ack the ISR
     for (deviceIndex = 0; deviceIndex < 32; deviceIndex++)
     {
         struct virtio_device_info* dev = &devInfoList[deviceIndex];
         if (dev->iobase==0) continue;
+
+        //TODO: should not just blindly ack, should check if data is pending for that device.
         INPORTB(v,dev->iobase+0x13);
         if (v&1 == 1) setSoftIRQ(SOFTIRQ_NET);
     }
@@ -121,30 +125,25 @@ void virtionet_start(struct NetworkCard* netcard)
         C_BREAKPOINT() //TODO: handle this instead of #BP
     }
 
-    buffer = (unsigned char*)kernelAllocPages(128); //TODO: use queue_size for that
+    rx->buffer = (unsigned char*)kernelAllocPages(128); //TODO: use queue_size for that
+    rx->chunk_size = FRAME_SIZE;
+    rx->available->flags = 1; 
+
+    // add all buffers in queue so we can receive data
+    buffer_info bi;
+    bi.size = FRAME_SIZE;
+    bi.buffer = 0;
+    bi.flags = VIRTIO_DESC_FLAG_WRITE_ONLY;
+    bi.copy = true;   
+ 
     for (i = 0; i < rx->queue_size; i++)
     {
-        rx->buffers[i].address = UNMIRROR((u64)&buffer[FRAME_SIZE*i]);
-        rx->buffers[i].length = FRAME_SIZE;
-        rx->buffers[i].flags = VIRTIO_DESC_FLAG_WRITE_ONLY;
-
-        // put all rx buffers in the available queue
-        rx->available->rings[i] = i;
-
+        virtio_send_buffer(dev,0,&bi,1);
     }
-    rx->available->flags = 1; 
-    rx->available->index = rx->queue_size;
    
     // setup the send buffers
-    buffer = kernelAllocPages(PAGE_COUNT(FRAME_SIZE*tx->queue_size));
-    for (i = 0; i < tx->queue_size; i++)
-    {
-        tx->buffers[i].address = UNMIRROR((u64)&buffer[FRAME_SIZE*i]);
-        tx->buffers[i].length = FRAME_SIZE;
-    
-        // put all rx buffers in the available queue. But we will keep the index to zero
-        tx->available->rings[i] = i;
-    }
+    tx->buffer = kernelAllocPages(PAGE_COUNT(FRAME_SIZE*tx->queue_size));
+    tx->chunk_size = FRAME_SIZE;
     tx->available->index = 0;
     OUTPORTW(0,dev->iobase+0x10); // tell the device that the available queue index changed
 
@@ -165,12 +164,14 @@ unsigned long virtionet_receive(unsigned char** buffer, struct NetworkCard* netc
     struct virtio_device_info* dev = (struct virtio_device_info*)netcard->deviceInfo;
     virt_queue* vq = &dev->queues[0]; // RX queue
     
+{u8* b = (u8*)0xB8002; if (*b=='z') *b='a'; else (*b)++;}
     if (vq->last_used_index == vq->used->index) return 0;
+
+{u8* b = (u8*)0xB8000; if (*b=='z') *b='a'; else (*b)++;}
     
     u16 index = vq->last_used_index % vq->queue_size;
     u16 buffer_index = vq->used->rings[index].index;
     *buffer = MIRROR((unsigned char*)(vq->buffers[buffer_index].address+sizeof(net_header)));
-
     return vq->used->rings[index].length;
 }
 
@@ -184,7 +185,11 @@ void virtionet_recvProcessed(struct NetworkCard* netcard)
     // we increase the available queue size but we dont need to put the buffer back in
     // the ring because it is already there. The available->index is already "queue_size" ahead of us
     // so increaseing by 1 will point to the ring entry of the current buffer since it will wrap around    
-    virtio_send_buffer(dev,vq,0,0);
+    buffer_info bi;
+    bi.size = FRAME_SIZE;
+    bi.buffer = 0;
+    bi.flags = VIRTIO_DESC_FLAG_WRITE_ONLY;
+    virtio_send_buffer(dev,0,&bi,1);
 }
 
 
@@ -208,17 +213,29 @@ unsigned long virtionet_send(struct NetworkBuffer *netbuf, struct NetworkCard* n
     h.flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
     h.gso_type = 0;
     h.checksum_start = 0;   
-    h.checksum_offset = size;   
+    h.checksum_offset = size;  
     bi[0].buffer = &h;
     bi[0].size = sizeof(net_header);
+    bi[0].flags = 0;
+    bi[0].copy = true;
     bi[1].buffer = netbuf->layer2Data;
     bi[1].size = netbuf->layer2Size;
+    bi[1].flags = 0;
+    bi[1].copy = true;
     bi[2].buffer = netbuf->layer3Data;
     bi[2].size = netbuf->layer3Size;
+    bi[2].flags = 0;
+    bi[2].copy = true;
     bi[3].buffer = netbuf->payload;
     bi[3].size = netbuf->payloadSize;
+    bi[3].flags = 0;
+    bi[3].copy = true;
 
-    virtio_send_buffer(dev, vq, bi, 4);
+
+    u64 count = 0;
+    while ((bi[count].size !=0) && (count < 4)) count++;
+
+    virtio_send_buffer(dev, 1, bi, count);
 
     return size;
 }

@@ -1,32 +1,13 @@
+- virtnet: 
+    - after a while, it stops responding. Maybe index is not sync'd anymore?
+        It's because we dont process incoming packets anymore
+        The interrupt is triggered but the softirq handler doesnt process it
+            if (vq->last_used_index == vq->used->index) returns
 
-- virtio network card driver.
-    - must create 2 buffers for header and data
-        - on buffer init: allocate each buffers in two parts and set "next" in driver init
-        - init of available: only every 2 buffers. repeat twice
-        - when sending buffer, must use two buffers
-        - clean: take care of both buffers
-    - document it
-        queues
-            for sending: put buf in avail, increase index, check used
-            for receiving: put empty buf (with size) in avail etc..
-        initializing
-            negotiation
-        sending
-        receiving and interrupts
-
-- virtio block device
-    - add an abastraction layer between block cache and ATA.
-        - it would load virtio and ata. It would decide where to route devices 0,1,2,3,4,5 etc...
-    - detect virtio 
-    - implement init,read,write,interrupt notification
+- balloon driver 
 
 - sockets still needs a lot of improvements (doc/net)
     - fsm for tcp ?
-
-- fat32 driver
-    - make real partionned drive
-    - change bootloader
-
 ------------ To do later -------------------------------
 - networking
     - arp_getMAC should not block.
@@ -53,6 +34,9 @@
     - IRQ sharing is inneficient: ie: rtl8139 loops trhough 32 devices and checks ISR
         should stop looping when seeing first empty device and and should check ISR faster
     - see memorymanagement in doc folder
+- fat32 driver
+    - make real partionned drive
+    - change bootloader
 ===================== Cool stuff to try =====================
 - usb driver
 - disk should be partitioned with MBR

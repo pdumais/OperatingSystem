@@ -100,6 +100,10 @@ typedef struct
     virtio_used* used;
     u16 last_used_index;
     u16 last_available_index;
+    u8* buffer;
+    u32 chunk_size;
+    u16 next_buffer;
+    u64 lock;
 } virt_queue;
 
 struct virtio_device_info
@@ -124,9 +128,14 @@ typedef struct
 {
     u8* buffer;
     u64 size;
+    u8 flags;
+    
+    // If the user wants to keep same buffer as passed in this struct, use "true".
+    // otherwise, the supplied buffer will be copied in the queues' buffer
+    bool copy;
 } buffer_info;
 
 bool virtio_init(struct virtio_device_info* dev, void (*negotiate)(u32* features));
 bool virtio_queue_setup(struct virtio_device_info* dev, unsigned char index);
 void virtio_clean_used_buffers(struct virtio_device_info* dev, u16 queue_index);
-void virtio_send_buffer(struct virtio_device_info* dev, virt_queue* vq, buffer_info b[], u64 count);
+void virtio_send_buffer(struct virtio_device_info* dev, u16 queue_index, buffer_info b[], u64 count);

@@ -92,15 +92,15 @@ mainkernelthread:
 
 
 
-    mov     $1,%rdi
+    mov     $4,%rdi             //4= virtio drive
     call    loadUserApplications
 
 //TEST
 //mov     $0,%rdi
-//mov     $0x1B01A8C0,%rsi
-//mov     teststr,%rdx
-//mov     $10,%rcx  
-//call    ip_send 
+//mov     $0x4,%rsi
+//mov     $KERNEL_BASE,%rdx
+//mov     $1,%rcx  
+//call    block_cache_write
 
 1:   
     call    manageConsoles

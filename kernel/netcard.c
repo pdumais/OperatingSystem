@@ -79,7 +79,7 @@ void net_init()
             netcard->send = &rtl8139_send;
             netcard->deviceInfo = (void*)netcard->init(addr);
         }
-        if (vendor == 0x1AF4 && (device >= 0x1000 && device <= 0x103F))
+        if (vendor == 0x1AF4 && (device >= 0x1000 && device <= 0x103F) && subsystem==1)
         {
             netcard->init = &initvirtionet;
             netcard->start = &virtionet_start;

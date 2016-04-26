@@ -9,10 +9,9 @@
 
 // external declarations
 extern void yield();
-extern void init_ata();
-extern int ata_read(unsigned int dev, unsigned long sector, char* buffer, unsigned long count);
-extern int ata_write(unsigned int dev, unsigned long sector, char* buffer, unsigned long count);
-extern unsigned char ata_isBusy(unsigned char);
+extern void init_block();
+extern int block_read(unsigned int dev, unsigned long sector, char* buffer, unsigned long count);
+extern int block_write(unsigned int dev, unsigned long sector, char* buffer, unsigned long count);
 extern void memcpy64(char* source, char* dest, unsigned long size);
 extern unsigned long getTicksSinceBoot();
 extern void spinLock(uint64_t*);
@@ -24,7 +23,7 @@ extern void rwlockReadUnlock(uint64_t*);
 
 // forward declarations
 void onxferComplete(unsigned char dev, unsigned long block, unsigned long count);
-void onataReady(unsigned char dev);
+void onblockReady(unsigned char dev);
 void schedule_io(int dev);
 bool transitionFromIdle(struct block_cache_entry* cacheEntry, uint8_t newstate);
 
@@ -165,10 +164,10 @@ void block_cache_init(char* cacheAddress)
         baseAddr+=512;
     }
 
-    init_ata(&onxferComplete, &onataReady);
+    init_block(&onxferComplete, &onblockReady);
 }
 
-void onataReady(unsigned char dev)
+void onblockReady(unsigned char dev)
 {
     // This handler is called when the ata handler has changed to ready state.
     // But it is possible that another competing thread initiates a transfer 
@@ -217,7 +216,7 @@ void lockBlockForUserRead(struct block_cache_entry* cacheEntry)
     // incrementing the readers counter since it is not allowed
     // to transition from IDLE when readers are present
     spinLock(&cacheEntry->idle_transition_critical_section);
-    __asm("lock incq (%0)" : : "r"(&cacheEntry->readers));
+    __asm("lock incq (%0)" : : "r"(&cacheEntry->readers)); //TODO I dont remeber why I lock twice
     spinUnlock(&cacheEntry->idle_transition_critical_section);
 
     while ((cacheEntry->state != BLOCK_CACHE_PENDING_WRITE) &&
@@ -232,6 +231,14 @@ void lockBlockForUserRead(struct block_cache_entry* cacheEntry)
 //      issuing a read request but we must not exceed cache size
 //      because right now, we issue a read sector by sector. but IRQ handler can already handle several sectors
 //      will need to modify schedule_io as well if we do that.
+//
+// NOTE: It is not a problem if the user requests more data than what the can can hold
+//       because we loop until we fill the user buffer. so we would end up
+//      overwriting cache entries for initial requests. This is not very performant though
+//      and could be improved.
+//
+//TODO: We should make these calls non-blocking. But then we would need a callback for data-ready and
+//      inform the user.
 int block_cache_read(unsigned long blockNumber, int dev, char* buffer, unsigned int numberOfBlocks)
 {
     unsigned long i;
@@ -285,7 +292,7 @@ void schedule_io(int dev)
     if (entry != 0)
     {
         entry->state = BLOCK_CACHE_READING;
-        if (ata_read(dev, entry->block, entry->data, 1))
+        if (block_read(dev, entry->block, entry->data, 1))
         {
             spinUnlock(&scheduleio_lock);
             return;
@@ -297,7 +304,7 @@ void schedule_io(int dev)
     if (entry != 0)
     {
         entry->state = BLOCK_CACHE_WRITING;
-        if (!ata_write(dev, entry->block, entry->data, 1))
+        if (!block_write(dev, entry->block, entry->data, 1))
         {
             entry->state = BLOCK_CACHE_PENDING_WRITE;
         }

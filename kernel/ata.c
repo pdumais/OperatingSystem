@@ -91,8 +91,8 @@ extern unsigned short pci_getIRQ(unsigned long addr);
 char tmpBuffer[512];
 char channelSlaveSelection=0;
 unsigned long busMasterRegister;
-struct operation pendingRequest[2];
-unsigned long long devices_lock[2];
+static struct operation pendingRequest[2];
+static unsigned long long devices_lock[2];
 
 atairqcallback irq_callback;
 atareadycallback ready_callback;
@@ -188,8 +188,6 @@ void ata_init_dev(unsigned short dev, unsigned char slave)
         }
     }
 
-
-
     for (i=0;i<128;i++)
     {
         INPORTL(val2,reg+ATA_REG_DATA);
@@ -210,7 +208,7 @@ void ata_init_dev(unsigned short dev, unsigned char slave)
 
 }
 
-void init_ata(atairqcallback irqcallback, atareadycallback readycallback)
+int init_ata(atairqcallback irqcallback, atareadycallback readycallback)
 {
     int dev;
     int i;
@@ -255,6 +253,9 @@ void init_ata(atairqcallback irqcallback, atareadycallback readycallback)
     {
         pf("Could not find IOAPIC mapping of IRQ 14 and 15: %x %x\r\n",irq14,irq15);
     }
+
+    // will only support 4 devices
+    return 4;
 }
 
 void convertDevId(unsigned int dev, unsigned int *device, unsigned char *slave)

@@ -8,11 +8,14 @@
 #define SOCKETSLIST     0x00000708
 #define RESERVED3       0x00000710
 #define RESERVED3END    0x00000BFF
-#define IOAPICHANDLERS  0x00000C00      // 1k
-#define SMP_TRAMPOLINE  0x00001000      // needs to be aligned on a 4k page 
-#define IPI_MESSAGES    0x00001100
-#define RESERVED4       0x00001300
+#define IOAPICHANDLERS  0x00000C00      
+#define RESERVED2       0x00001C00      
+#define RESERVED2END    0x00001FFF      
+#define SMP_TRAMPOLINE  0x00002000      // needs to be aligned on a 4k page 
+#define IPI_MESSAGES    0x00002100
+#define RESERVED4       0x00002300
 #define RESERVED4END    0x00005FFF
+
 #define IDTSPACE        0x00006000
 #define RESERVED1       0x00007000
 #define RESERVED1END    0x00007FFF

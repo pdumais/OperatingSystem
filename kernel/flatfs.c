@@ -1,6 +1,7 @@
 #include "flatfs.h"
 #include "block_cache.h"
 #include "display.h"
+#include "utils.h"
 
 extern void memcpy64(char* source, char* destination, uint64_t size);
 
@@ -16,7 +17,7 @@ bool flatfs_fopen(system_handle* h, char* name, uint64_t access_type)
     char index[5120];
     n1 = name[0];
     n2 = name[1];
-    device = ((n1-0x30)<<4) || (n2-0x30);
+    device = ((n1-0x30)<<4) | (n2-0x30);
     name += 4; // skip the xx:/ part of path
     
     block_cache_read(0,device,index,10);
