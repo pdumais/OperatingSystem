@@ -1,10 +1,6 @@
-- virtnet: 
-    - after a while, it stops responding. Maybe index is not sync'd anymore?
-        It's because we dont process incoming packets anymore
-        The interrupt is triggered but the softirq handler doesnt process it
-            if (vq->last_used_index == vq->used->index) returns
-
 - balloon driver 
+    document basic virtio
+    document baloon, publish on osdev
 
 - sockets still needs a lot of improvements (doc/net)
     - fsm for tcp ?
@@ -37,6 +33,19 @@
 - fat32 driver
     - make real partionned drive
     - change bootloader
+- memory
+    reclaim unused memory:
+        pages below stack pointer should be unamapped
+        pages in heap that are not used should be unmapped
+            those pages would be in "free" zones of heap. Since the heap is a chained list,
+            we can detect "free" areas between two chains.
+
+        Free heap pages could be scavenged by another process or the user process
+        could tell the kernel when calling free().
+    balloon:
+        physical pages that are not mapped anywhere can be reclaimed by host
+
+    - document layers of mem: host physical, guest phys, guest virtual (allocated by #PF), heap (malloc and chained list)
 ===================== Cool stuff to try =====================
 - usb driver
 - disk should be partitioned with MBR

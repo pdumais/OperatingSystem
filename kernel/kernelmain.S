@@ -71,6 +71,7 @@ mainkernelthread:
     call    initKeyboard
     call    net_init
     call    net_start
+
     mov     $BLOCK_CACHE,%rdi        // blockNumber 242
     call    block_cache_init
 
@@ -96,17 +97,21 @@ mainkernelthread:
     call    loadUserApplications
 
 //TEST
-//mov     $0,%rdi
-//mov     $0x4,%rsi
-//mov     $KERNEL_BASE,%rdx
-//mov     $1,%rcx  
-//call    block_cache_write
+mov     $0,%rdi
+mov     $0x4,%rsi
+mov     $KERNEL_BASE,%rdx
+mov     $1,%rcx  
+call    ip_send
 
 1:   
     call    manageConsoles
     call    manageDeadProcesses
 
-
+//mov $0xc093,%dx; inb %dx,%al; 
+//cmp $0,%al
+//je 343f
+//int $3
+//343:
 
 mov $INTA0_POLL_IN,%rax
 int $0xA0
@@ -119,7 +124,7 @@ jmp 3f
 4:
 cmp $0x31,%al
 jne 4f
-mov     $1,%rdi
+mov     $4,%rdi
 call    loadUserApplications
 4:
 cmp $'z',%al

@@ -36,7 +36,10 @@ static void handler()
 
         //TODO: should not just blindly ack, should check if data is pending for that device.
         INPORTB(v,dev->iobase+0x13);
-        if (v&1 == 1) setSoftIRQ(SOFTIRQ_NET);
+        if (v&1 == 1) 
+        {
+            setSoftIRQ(SOFTIRQ_NET);
+        }
     }
 }    
 
@@ -127,7 +130,8 @@ void virtionet_start(struct NetworkCard* netcard)
 
     rx->buffer = (unsigned char*)kernelAllocPages(128); //TODO: use queue_size for that
     rx->chunk_size = FRAME_SIZE;
-    rx->available->flags = 1; 
+    rx->available->index = 0;
+    virtio_enable_interrupts(rx);
 
     // add all buffers in queue so we can receive data
     buffer_info bi;
@@ -136,7 +140,7 @@ void virtionet_start(struct NetworkCard* netcard)
     bi.flags = VIRTIO_DESC_FLAG_WRITE_ONLY;
     bi.copy = true;   
  
-    for (i = 0; i < rx->queue_size; i++)
+    for (i = 0; i < 10/*rx->queue_size*/; i++)
     {
         virtio_send_buffer(dev,0,&bi,1);
     }
@@ -163,16 +167,23 @@ unsigned long virtionet_receive(unsigned char** buffer, struct NetworkCard* netc
 {
     struct virtio_device_info* dev = (struct virtio_device_info*)netcard->deviceInfo;
     virt_queue* vq = &dev->queues[0]; // RX queue
-    
-{u8* b = (u8*)0xB8002; if (*b=='z') *b='a'; else (*b)++;}
+    virtio_disable_interrupts(vq);
+
+//TODO: remove    
+u64* a = 0x710;
+u64* b = 0x718;
+u64* c = 0x720;
+*a = vq->used->index;
+*b = vq->available->index;
+*c = vq->last_used_index;
+
     if (vq->last_used_index == vq->used->index) return 0;
 
-{u8* b = (u8*)0xB8000; if (*b=='z') *b='a'; else (*b)++;}
     
     u16 index = vq->last_used_index % vq->queue_size;
     u16 buffer_index = vq->used->rings[index].index;
     *buffer = MIRROR((unsigned char*)(vq->buffers[buffer_index].address+sizeof(net_header)));
-    return vq->used->rings[index].length;
+    return vq->used->rings[index].length-sizeof(net_header);
 }
 
 void virtionet_recvProcessed(struct NetworkCard* netcard)
@@ -190,6 +201,7 @@ void virtionet_recvProcessed(struct NetworkCard* netcard)
     bi.buffer = 0;
     bi.flags = VIRTIO_DESC_FLAG_WRITE_ONLY;
     virtio_send_buffer(dev,0,&bi,1);
+    virtio_enable_interrupts(vq);
 }
 
 
@@ -230,7 +242,6 @@ unsigned long virtionet_send(struct NetworkBuffer *netbuf, struct NetworkCard* n
     bi[3].size = netbuf->payloadSize;
     bi[3].flags = 0;
     bi[3].copy = true;
-
 
     u64 count = 0;
     while ((bi[count].size !=0) && (count < 4)) count++;

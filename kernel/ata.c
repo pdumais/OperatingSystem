@@ -93,6 +93,7 @@ char channelSlaveSelection=0;
 unsigned long busMasterRegister;
 static struct operation pendingRequest[2];
 static unsigned long long devices_lock[2];
+static u64 device_size[4];
 
 atairqcallback irq_callback;
 atareadycallback ready_callback;
@@ -156,7 +157,7 @@ void ata_init_dev(unsigned short dev, unsigned char slave)
     unsigned int signature;
     unsigned int reg = CH1BASE - (dev<<7);
 
-    pf("ATA DEVICE %x,%x: ",reg,slave);
+//    pf("ATA DEVICE %x,%x: ",reg,slave);
     
     ata_select_device(dev,slave);
 
@@ -172,14 +173,14 @@ void ata_init_dev(unsigned short dev, unsigned char slave)
         INPORTB(val,reg+ATA_REG_STATUS);
         if (val == 0)
         {
-            pf("none\r\n");
+  //          pf("none\r\n");
             return;
         } 
         else if (val&ATA_SR_ERR)
         {
             // Identify command does not work for ATAPI devices. Need to send IDENTIFY_PACKET.
             // but we will just ignore it here, we dont care about cdroms yet.
-            pf("ATAPI\r\n");
+    //        pf("ATAPI\r\n");
             return;
         } 
         else if (!(val&ATA_SR_BSY)&&(val&ATA_SR_DRQ))
@@ -198,8 +199,9 @@ void ata_init_dev(unsigned short dev, unsigned char slave)
     if (val2 & (1<<26))
     {
         val2 = *((unsigned int *)(tmpBuffer+200));
-        pf("supported 48bit LBA device of size %x\r\n",val2*512);
+        //pf("supported 48bit LBA device of size %x\r\n",val2*512);
         OUTPORTB(3,reg+ATA_REG_FEATURES); // DMA
+        device_size[(dev*2)+slave] = val2;
     }
     else
     {
@@ -208,15 +210,17 @@ void ata_init_dev(unsigned short dev, unsigned char slave)
 
 }
 
-int init_ata(atairqcallback irqcallback, atareadycallback readycallback)
+u64 ata_get_size(u64 dev)
 {
-    int dev;
+    return device_size[dev];
+}
+
+u64 ata_add_device(u32 dev, u32 iobase, u64* hw_index)
+{
     int i;
+    //TODO: should not allow to add more than one of these devices
+    *hw_index = 0;
 
-    irq_callback = irqcallback;
-    ready_callback = readycallback;
-
-    dev = pci_getDevice(0x8086,0x7010);
     pci_enableBusMastering(dev);
 
     busMasterRegister = pci_getBar(dev,4) & ~1;
@@ -253,9 +257,18 @@ int init_ata(atairqcallback irqcallback, atareadycallback readycallback)
     {
         pf("Could not find IOAPIC mapping of IRQ 14 and 15: %x %x\r\n",irq14,irq15);
     }
-
-    // will only support 4 devices
     return 4;
+}
+
+bool ata_pci_device_matches(u16 vendor, u16 device, u16 subsystem)
+{
+    return (vendor == 0x8086 && device == 0x7010);
+}
+
+void init_ata(atairqcallback irqcallback, atareadycallback readycallback)
+{
+    irq_callback = irqcallback;
+    ready_callback = readycallback;
 }
 
 void convertDevId(unsigned int dev, unsigned int *device, unsigned char *slave)

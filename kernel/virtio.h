@@ -139,3 +139,5 @@ bool virtio_init(struct virtio_device_info* dev, void (*negotiate)(u32* features
 bool virtio_queue_setup(struct virtio_device_info* dev, unsigned char index);
 void virtio_clean_used_buffers(struct virtio_device_info* dev, u16 queue_index);
 void virtio_send_buffer(struct virtio_device_info* dev, u16 queue_index, buffer_info b[], u64 count);
+void virtio_disable_interrupts(virt_queue* vq);
+void virtio_enable_interrupts(virt_queue* vq);

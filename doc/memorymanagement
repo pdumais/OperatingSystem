@@ -5,7 +5,7 @@ is no free block reaping after free. pages freed after process death
 need better system:
 
 - should reclaim unused pages such as:
-    a low-priority task than scavenges unused pages.
+    a low-priority task than scavenges unused pages. Kind of like a garbage collector
     The task would go through all processes and invoke:
         - scanvengeStack()
         - scavengeHeap(size,F)

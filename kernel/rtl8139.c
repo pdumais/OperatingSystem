@@ -134,6 +134,7 @@ unsigned long rtl8139_getMACAddress(struct NetworkCard* netcard)
 
 void* initrtl8139(unsigned int deviceAddr)
 {
+
     unsigned int templ;
     unsigned short tempw;
     unsigned long i;
@@ -174,6 +175,7 @@ void* initrtl8139(unsigned int deviceAddr)
             devInfo->memoryAddress = m & 0xFFFFFFF0;
         }
     }
+
 
     devInfo->irq = pci_getIOAPICIRQ(devInfo->deviceAddress);
     registerIRQ(&handler,devInfo->irq);

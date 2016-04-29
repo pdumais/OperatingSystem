@@ -78,7 +78,17 @@ bool virtio_init(struct virtio_device_info* dev, void (*negotiate)(u32* features
     OUTPORTB(c,dev->iobase+0x12);
 }
 
-void virtio_clean_used_buffers(struct virtio_device_info* dev, u16 queue_index)
+void virtio_enable_interrupts(virt_queue* vq)
+{
+    vq->used->flags = 0;
+}
+
+void virtio_disable_interrupts(virt_queue* vq)
+{
+    vq->used->flags = 1;
+}
+
+/*void virtio_clean_used_buffers(struct virtio_device_info* dev, u16 queue_index)
 {
     virt_queue* vq = &dev->queues[queue_index];
 
@@ -95,8 +105,7 @@ void virtio_clean_used_buffers(struct virtio_device_info* dev, u16 queue_index)
         index++;
     }
     vq->last_used_index = index;
-}
-
+}*/
 void virtio_send_buffer(struct virtio_device_info* dev, u16 queue_index, buffer_info b[], u64 count)
 {
     u64 i;
@@ -135,7 +144,6 @@ void virtio_send_buffer(struct virtio_device_info* dev, u16 queue_index, buffer_
         }
         buffer_index = next_buffer_index;
     }
-
     vq->next_buffer = buffer_index;
 
     vq->available->index++;
@@ -144,6 +152,6 @@ void virtio_send_buffer(struct virtio_device_info* dev, u16 queue_index, buffer_
     // now, we will clear previously used buffers, it any. We do this here instead of in the interrupt
     // context. It adds latency to the calling thread instead of adding latency to any random thread
     // where the interrupt would be called from.
-    virtio_clean_used_buffers(dev, queue_index);
+//    virtio_clean_used_buffers(dev, queue_index);
     spinUnlock(&vq->lock);
 }

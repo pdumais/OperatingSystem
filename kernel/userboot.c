@@ -91,7 +91,7 @@ uint64_t loadProcess(char* name, bool createNewConsole)
     file_handle* f = fopen(name,ACCESS_TYPE_READ);
     if (f == 0)
     {
-        pf("File not found\r\n");
+        pf("File not found [%s]\r\n",name);
         return 0;
     }
 
@@ -165,12 +165,11 @@ void loadUserApplications(uint64_t device)
         return;
     }
 
-//    block_cache_read(1,device,bootscript,1);    // read bootscript
-    fread(f,512,bootscript);
+    int fsize = fread(f,512,bootscript);
     fclose(f);
 
     n = 0;
-    for (i = 0; i< 512; i++)
+    for (i = 0; i< fsize; i++)
     {
         if (bootscript[i] == 0) break;
         if (bootscript[i] == 0x0A)

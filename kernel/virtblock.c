@@ -22,9 +22,6 @@
 typedef void (*virtioirqcallback)(unsigned char, unsigned long, unsigned long);
 typedef void (*virtioreadycallback)(unsigned char);
 
-extern unsigned int pci_getDeviceByClass(unsigned char class, unsigned char index, unsigned long* vendor, unsigned long* device, unsigned short* sub);
-extern unsigned int pci_getBar(unsigned int dev,unsigned char bar);
-extern unsigned short pci_getIRQ(unsigned int dev);
 extern void pci_enableBusMastering(unsigned int dev);
 extern void registerIRQ(void* handler, unsigned long irq);
 extern void setSoftIRQ(unsigned long);
@@ -110,9 +107,12 @@ static void negotiate(u32* features)
     DISABLE_FEATURE(*features,VIRTIO_BLK_F_TOPOLOGY);
 }
 
-void virtio_add_device(u32 addr)
+u64 virtioblock_add_device(u32 addr, u32 iobase, u64* hw_index)
 {
     u32 i;
+    u32 irq = pci_getIOAPICIRQ(addr);
+
+    // Find empty device slot
     int dev = -1;
     for (i = 0; i <32; i++) if (block_devices[i].block_count == 0)
     {
@@ -123,25 +123,16 @@ void virtio_add_device(u32 addr)
     {
         pf("Maximum number of virtio block devices reached");
         C_BREAKPOINT();
+        return 0;
     }
+
+    *hw_index = dev;
 
     struct virtio_device_info* devInfo = &block_devices[dev];
+    devInfo->iobase = iobase;
     devInfo->deviceAddress = addr;
-    for (i=0;i<6;i++)
-    {
-        u32 m = pci_getBar(devInfo->deviceAddress,i);
-        if (m==0) continue;
-        if (m&1)
-        {
-            devInfo->iobase = m & 0xFFFC;
-        }
-        else
-        {
-            devInfo->memoryAddress = m & 0xFFFFFFF0;
-        }
-    }
+    devInfo->irq = irq; 
 
-    devInfo->irq = pci_getIOAPICIRQ(devInfo->deviceAddress);
     registerIRQ(&handler,devInfo->irq);
     pci_enableBusMastering(devInfo->deviceAddress);
 
@@ -165,30 +156,25 @@ void virtio_add_device(u32 addr)
     // alloc meme for buf1 (request header) and buffer 3 (status byte). buffer2 will be user-supplied.
     u32 bufferSize = vq->queue_size*(sizeof(block_request_header)+1);
     vq->buffer = kernelAllocPages(PAGE_COUNT(bufferSize));
+
+    return 1;
 }
 
-int init_virtioblock(virtioirqcallback irqcallback, virtioreadycallback readycallback)
+bool virtblock_pci_device_matches(u16 vendor, u16 device, u16 subsystem)
 {
-    u32 i;
-    u32 dev_count = 0;
-    u64 device,vendor;
-    u16 subsystem;
+    return (vendor == 0x1AF4 && (device >= 0x1000 && device <= 0x103F) && subsystem == 2);
+}
 
+void init_virtioblock(virtioirqcallback irqcallback, virtioreadycallback readycallback)
+{
     irq_callback = irqcallback;
     ready_callback = readycallback;
+}
 
-    for (i = 0; i < 32; i++)
-    {
-        u32 addr = pci_getDeviceByClass(1,i,&vendor,&device,&subsystem);
-        if (addr==0xFFFFFFFF) break;
-        if (vendor == 0x1AF4 && (device >= 0x1000 && device <= 0x103F) && subsystem == 2)
-        {
-            virtio_add_device(addr);
-            dev_count++;
-        }
-    }
-
-    return dev_count;
+u64 virtblock_get_size(u64 dev)
+{
+    virtio_block_device* bdev = &block_devices[dev];
+    return bdev->block_count;
 }
 
 /*

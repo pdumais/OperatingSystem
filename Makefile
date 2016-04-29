@@ -19,9 +19,10 @@ run:
 		-monitor stdio -curses \
 		-drive file=image/disk.img,if=ide \
 		-drive file=userapps/disk.img,if=virtio \
+		-drive file=hddtest1/test2.img,if=virtio \
 		-net nic,model=virtio,macaddr=52:54:00:12:34:60 -net tap,vlan=0,ifname=tap4,script=no \
-		-net nic,model=rtl8139,macaddr=52:54:00:12:34:61 -net tap,vlan=1,ifname=tap7,script=no \
 		-d cpu_reset -D qemu.log 
+#		-net nic,model=rtl8139,macaddr=52:54:00:12:34:61 -net tap,vlan=1,ifname=tap1,script=no \
 	
 
 test:

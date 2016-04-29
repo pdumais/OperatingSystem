@@ -883,6 +883,7 @@ exitRegisterIRQ:
 ////////////////////////////////////////////////////////////////////////////////////
 baseIRQHandler:
     PUSHAEXCEPTRAX              // rax was saved before going here
+
     mov     $16,%rcx
 1:  cmp     $0,(%rax)
     jz      baseIRQHandlerExit  // no more handlers, exit
@@ -895,6 +896,7 @@ baseIRQHandler:
     loop    1b
 baseIRQHandlerExit:
     call    ackAPIC       //TODO: should indicate which IOAPIC
+
     POPA
     iretq
 
