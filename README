@@ -3,6 +3,8 @@
 
 Specifications:
     disk is a raw image with no MBR or partition
+    user applications are stored in a tar file. The tar file is used as a readonly disk
+        using "flatfs" as the "tar" filesystem
     paging uses identity mapping of the 128 first mb with 2mb pages
       and gig256-260 map to 0g-4g  
     supports ring3 user threads and ring0 kernel threads

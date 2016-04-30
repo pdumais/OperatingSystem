@@ -3,9 +3,60 @@
 #include "display.h"
 #include "utils.h"
 
+/*
+This file system driver implements a flat fs following the "tar" file format.
+
+*/
+
 extern void memcpy64(char* source, char* destination, uint64_t size);
+extern uint64_t block_get_size(uint32_t device);
+
+typedef struct
+{
+    char name[100];
+    char mode[8];
+    char owner[8];
+    char group[8];
+    char size[12];
+    char last_modification[12];
+    char checksum[8];
+    char link_indicator;
+    char link_name[100];
+    char pad[255];
+} tar_header;
+
 
 void flatfs_system_handle_destructor(system_handle* h);
+
+bool strcompare(char* src, char* dst)
+{
+    if (*src == 0 || *dst == 0) return false;
+    while(*src == *dst && *src != 0)
+    {
+        src++;
+        dst++;
+    }
+    return (*src == 0 && *dst == 0);
+}
+
+    // converts from ascii octal to bin number
+uint64_t ascii2number(char* c, uint8_t size)
+{
+    uint8_t byte;
+    uint64_t ret = 0;
+    uint64_t factor = 1;
+    size-=2;
+    char *buf = c+size;
+    while (size)
+    {
+        byte = (*buf)-0x30;
+        ret += ((uint64_t)byte)*factor; 
+        buf--;
+        factor <<= 3;
+        size--;
+    }
+    return ret;
+}
 
 bool flatfs_fopen(system_handle* h, char* name, uint64_t access_type)
 {
@@ -14,39 +65,37 @@ bool flatfs_fopen(system_handle* h, char* name, uint64_t access_type)
     file_handle* f = (file_handle*)h;
     h->destructor = &flatfs_system_handle_destructor;
 
-    char index[5120];
     n1 = name[0];
     n2 = name[1];
     device = ((n1-0x30)<<4) | (n2-0x30);
     name += 4; // skip the xx:/ part of path
     
-    block_cache_read(0,device,index,10);
-  
+    tar_header header;
+    int sector = 0;
+
     f->position = 0;
     f->start = -1;
     f->size = 0;
     f->device = device;
-    char* lbuf = (uint64_t*)&index[0];
-    for (i = 0; i < 100; i++)       // index can't contain more than 100 entries    
-    {
-        for (n=0;n<32;n++)
-        {
-            if (lbuf[n]==0x20 && name[n]==0)
-            {
-                f->start = ((*((uint64_t*)&lbuf[32]))>>9);
-                f->size = *((uint64_t*)&lbuf[40]);
-                break;
-            }
-            if (lbuf[n] != name[n]) break;
 
+    uint64_t disk_size = block_get_size(device);
+    uint64_t fsize;
+
+    while ((sector) < disk_size)
+    {
+        block_cache_read(sector,device,&header,1);
+        char* fname = &header.name[2]; // skip the "./" in the tar filename
+        fsize = ascii2number(header.size,12);
+        if (strcompare(fname,name))
+        {
+            f->start = sector+1;
+            f->size = fsize;
+            return true;
         }
 
-        lbuf += (32+8+8);         // each index entries are 32+8+8 long
+        sector += (((fsize+511)&0x1FF)>>9)+1;
     }
-
-    if (f->start == -1 || f->size ==-1) return false;
-
-    return true;
+    return false;
 }
 
 uint64_t flatfs_fread(system_handle* h, uint64_t count, char* destination)

@@ -11,13 +11,9 @@ appsbin/%.bin:%
 	 cd $< && make
 
 apps: systemlib $(BINS) 
-	 ./mkimage.pl
-	 cp index.bin disk.img
-	 cat apps.bin >> disk.img
+	tar -cf disk.img -C appsbin/ .
+	tar -rf disk.img -C bulkfiles/ .
 
 clean:
 	 cd systemlib && make clean
 	 rm -Rf appsbin
-	 rm index.bin
-	 rm disk.img
-	 rm apps.bin

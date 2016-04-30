@@ -156,6 +156,7 @@ void init_block(blockirqcallback icb, blockreadycallback rcb)
                     devices[dev_num].hw_device_number = hw_index; 
                     devices[dev_num].read = driver->read;
                     devices[dev_num].write = driver->write;
+                    devices[dev_num].get_size = driver->get_size;
                     devices[dev_num].type = driver->type;
                     pf("Adding block device number %x, type [%x], hw index [%x], size [%x]\r\n",
                         dev_num,driver->type, hw_index, (driver->get_size(hw_index)*512));
@@ -179,4 +180,10 @@ int block_write(unsigned int dev, unsigned long sector, char* buffer, unsigned l
 {
     block_device* d = &devices[dev];
     return d->write(d->hw_device_number,sector,buffer,count);
+}
+
+u64 block_get_size(unsigned int dev)
+{
+    block_device* d = &devices[dev];
+    return d->get_size(d->hw_device_number);
 }

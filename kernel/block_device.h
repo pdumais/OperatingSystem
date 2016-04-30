@@ -6,6 +6,7 @@ typedef struct
 {
     int (*read)(unsigned int,unsigned long, char*, unsigned long);
     int (*write)(unsigned int,unsigned long, char*, unsigned long);
+    unsigned long long (*get_size)(unsigned int);
     unsigned char (*isBusy)(unsigned char);
 
     unsigned int hw_device_number;
