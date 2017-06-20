@@ -196,8 +196,7 @@ exceptionDHandler:
 ////////////////////////////////////////////////////////////////////////////////////
 // Exception 0x0E: Page Fault
 //  In here, we will try to recover from the fault by allocating a page
-//  for the offending virtual address if it is for stack. Otherwise, let
-//  thread crash.
+//  for the offending virtual address.
 //
 //  The page fault handler is not the most efficient one. It blindly allocates
 //  a physical page to unallocated virtual addresses. The only thing it checks
@@ -263,8 +262,9 @@ exceptionEHandler:
     mov         (%rax),%rbx         // rax = PTE address for faulty address
     mov         %rax,%rbx
 
+    // At this point, all checks are good. Allocate 1 page for that area
     mov         $1,%rdi
-    call        allocateStackPage
+    call        allocateStackPage   // misleading name. Also allocates for heap
 
     // make the mapping in the page table
     or          $0b001000000111,%rax

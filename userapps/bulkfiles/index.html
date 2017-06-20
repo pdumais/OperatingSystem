@@ -1,19 +1,23 @@
 <html>
 <body>
 Oh yeah! This web page is served by my awesome web server
-running on my awesome OS. All home-brewed bro!
+running on my awesome OS. All home-brewed bro! This machine is NOT running windows nor linux.
+It is not using a POSIX kernel either. This is 100% code from scratch from the moment
+the BIOS handled controlled to the boot code.
 <br/>
 Do you have any idea how many operations that involved?
 A webserver application needed to open up a socket in listening mode and
 read files from disk and serve it to you. That involved:
 <ul>
+<li>Writing a bootloader to oot my kernel
+<li>Booting the system in long mode (64bit, because by default we boot in 16bit mode)
 <li>A virtual memory subsystem was implemented to support paging with 4k pages
 <li>A stack and heap mechanism was developed.
 <li>A scheduler was implemented and then a process launching system.
-<li>A network card driver
+<li>A network card driver (virtio)
 <li>An interrupt management and IRQ (usign APIC) was needed
-<li>Then a TCP/IP stack was created
-<li>A ATA disk driver
+<li>Then a network stack was created (This includes ARP, IP routing, sockets, TCP, UDP etc..)
+<li>A virtio disk driver
 <li>A block cache to cache any blocks read from disk (or written to).
 <li>A system call mechanism to allow RING3 applications to requests OS calls.
 </ul>

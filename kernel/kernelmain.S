@@ -113,7 +113,7 @@ call    ip_send
 //int $3
 //343:
 
-mov $INTA0_POLL_IN,%rax
+/*mov $INTA0_POLL_IN,%rax
 int $0xA0
 cmp $0,%rax
 jz 3f
@@ -144,8 +144,8 @@ mov $teststr,%rdi
 mov %al,(%rdi)
 mov $INTA0_PRINTF,%rax
 int $0xA0
-3:
-
+3:*/
+    hlt
     jmp     1b
 
 blockbuffer:

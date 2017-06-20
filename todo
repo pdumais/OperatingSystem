@@ -1,21 +1,37 @@
-- balloon driver 
-    document basic virtio
-    document baloon, publish on osdev
+- memory:
+    free:
+        When the process starts, it's heap is just a big chunk of unallocated memory.
+        As malloc is called, some pages are reserved in that area.
+        Free will inform the kernel about what page is the last one used in the heap after 
+        the request buffer is freed. So the kernel will release all pages in the heap that
+        resides after that page. 
+    **** implement release_pages in mmu.S
+
+    system_reclaim_memory:
+        invoke memory_pool_reclaim 
+    balloon driver:
+        reclaim mem
+        tell host what pages are not present
+
+- how to make thread sleep and wakeup upon HW event or mutex unlock?
+    - also robust in case of crash
+- raid layer
+
+- USB (to access usb serial port?)
 
 - sockets still needs a lot of improvements (doc/net)
     - fsm for tcp ?
 ------------ To do later -------------------------------
+- GUI
 - networking
     - arp_getMAC should not block.
     - udp sockets
     - dns resolution before connect() (connect would always require ip)
     - DHCP
-- mem pool: invoke memory_pool_reclaim when running low on mem
 - hexdump app: should be able to pass filename through command-line params
     - should get pushed on stack?
     - or just the pointer to string passed? but that new process
       might not have access right to mirrorspace
-- how to make thread sleep and wakeup upon HW event or mutex unlock?
 - serial port: can feed console like keyboard, could make a separate flush function
 - Possible bugs:
     -   If a process has two virt page that maps to the same phys and the thread dies,
@@ -33,19 +49,6 @@
 - fat32 driver
     - make real partionned drive
     - change bootloader
-- memory
-    reclaim unused memory:
-        pages below stack pointer should be unamapped
-        pages in heap that are not used should be unmapped
-            those pages would be in "free" zones of heap. Since the heap is a chained list,
-            we can detect "free" areas between two chains.
-
-        Free heap pages could be scavenged by another process or the user process
-        could tell the kernel when calling free().
-    balloon:
-        physical pages that are not mapped anywhere can be reclaimed by host
-
-    - document layers of mem: host physical, guest phys, guest virtual (allocated by #PF), heap (malloc and chained list)
 ===================== Cool stuff to try =====================
 - usb driver
 - disk should be partitioned with MBR

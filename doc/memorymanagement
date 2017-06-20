@@ -1,32 +1,49 @@
+The memory releasing mechnasim is pretty naive. Instead of having a heap that grows and shrink 
+like linux, we just immediately free pages as they become unused in the heap. This has the advantage
+of maximizing memory usage wince every page that is not used will be released imemdiately. But this
+will impact performances when a process makes a lot of request to allocate/free small object because
+the memory will be freed completely and re-allocated everytime. On linux, the pages would still
+be allocated since freeing memory only has the effect of shrinking the heap, and fragmented memory
+is not freed.
+
+when mem is needed
+    find all present pages with "accessed" cleared and free them.
+    these pages must be invalidated from TLB (and do TLB shootdown)
+NOTES:
+    after #PF, the page will be present but "accessed" will be 0. We must not reap those.
+    When reaping a page, another CPU might try to access the page.
+        using cmpxchg, we must guarantee that "P" will be cleared only if "Accessed" is still 0
+
+
+
+The "linux" way of doing this would be to have the kernel give a heap to the process. The kernel
+does not track free memory within the heap. This is done by malloc() in user space. 
+If malloc detect that the heap is too smal, it requests the kernel to grow it. 
+When freeing memory, the kernel is informed if the top of the heap should change and
+the kernel will shrink it back
+
+--------------------------------------------------------------
+        OLD IDEAS
+--------------------------------------------------------------
 Need a better memory management method
 
-right now malloc reserves virt mem and phys is mapped on #pf only. there
-is no free block reaping after free. pages freed after process death
+right now malloc reserves virt mem and phys is mapped upon #pf only. there
+is no free block remaping after free. pages freed after process death
 need better system:
-
-- should reclaim unused pages such as:
-    a low-priority task than scavenges unused pages. Kind of like a garbage collector
-    The task would go through all processes and invoke:
-        - scanvengeStack()
-        - scavengeHeap(size,F)
-            F is a function void F(start,end).
-            It will loop through the heap and find all
-            areas larger than "size" and invoke F(area_start,area_end)
-            The F function will then be able to free pages.
-    But while scavenging, the stack should not move, nor the heap!!            
+    - should reclaim unused pages such as:
+        a low-priority task than scavenges unused pages. Kind of like a garbage collector
+        The task would go through all processes and invoke:
+            - scanvengeStack()
+            - scavengeHeap(size,F)
+                F is a function void F(start,end).
+                It will loop through the heap and find all
+                areas larger than "size" and invoke F(area_start,area_end)
+                The F function will then be able to free pages.
+        But while scavenging, the stack should not move, nor the heap!!            
 -----
 on free: 
     tell the kernel that what range was freed and let him dealloc pages
-    OR
-    tell him what is the highest address reserved
-        - it will free pages between old highest and new highest
-        - wont work well with fragmentation
 
-on malloc:
-    tell kernel what range was allocated
-        - since pages not present, we can use other bits to indicate that this page is reserved
-        - on #PF, if page not reserved, then dont allocate it.
-    
 
 stack: *** Search for "stack page deallocation"
     will need to scavenge.
@@ -35,6 +52,7 @@ stack: *** Search for "stack page deallocation"
         thread going to sleep?
 
 
+-----------------------------------------------------------------------------------------
 other concept:
     process gets a pool of heap. It starts with, let's say, 16mb in the pool. The pages are not allocated but they are reserved
     These are the virtual pages of the process. Since they are not present, we can use the rest of the bits to indicate that
@@ -48,5 +66,4 @@ other concept:
 
 
 
------------------------------------------------------------------------------------------
 

@@ -1,5 +1,6 @@
 #include "includes/kernel/hashtable.h"
 
+extern void memcpy64(void* source, void* destination, uint64_t size);
 extern void memclear64(void* dst, uint64_t size);
 extern void rwlockWriteLock(uint64_t*);
 extern void rwlockWriteUnlock(uint64_t*);
@@ -81,7 +82,7 @@ void hashtable_add(hashtable* ht,uint64_t keysize, uint64_t* key, hashtable_node
     rwlockWriteUnlock(&bucket->lock);
 }
 
-inline bool comparekey(uint64_t* src, uint64_t* dst, uint64_t size)
+static inline bool comparekey(uint64_t* src, uint64_t* dst, uint64_t size)
 {
     uint64_t i;
     for (i=0; i< size; i++) if (src[i]!=dst[i]) return false;

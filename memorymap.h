@@ -23,8 +23,8 @@
 #define PDPTTABLE       0x00009000      // needs to be 4k aligned. we only use 4 entries (so 16bytes)
 #define PDTABLE         0x0000A000      // need to be 4k aligned. enough space for 4 page directories (4gig total)
 #define PDTABLEIDENTITY 0x0000E000      // need to be 4k aligned. enough space for 4 page directories (4gig total)
-#define RESERVED2       0x00012000
-#define RESERVED2END    0x0000FFFF
+#define RESERVED5       0x00012000
+#define RESERVED5END    0x0000FFFF
 #define PRDT1           0x00010000
 #define PRDT2           0x00010010
 #define TASKLIST_BASE   0x00020000

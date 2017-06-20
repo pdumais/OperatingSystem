@@ -278,10 +278,36 @@ free:
     jb          3f
     xor         %r8,%r8
 
-    // At this point, we found the previous, victom and next blocks
+    // At this point, we found the previous, victim and next blocks
     // rdi=VICTIM = (address-16)
     // r8=NEXT =  (or 0)
     // r9=PREVIOUS = previous MAE (or 0)
+
+
+
+    // The pages that we are freeing should be given back to kernel.
+    // These pages are all of those residing AFTER the header and BEFORE the
+    // next linked-list header
+    // First free page: (rdi+16+4095)>>12 
+    // Last free page: (r8-4096) >> 12
+    // if r8 == 0, then last = HEAP_TOP >> 12
+    // if last < first, then do nothing
+    push        %rdi
+    push        %rsi
+    cmp         $0,%r8
+    je          1f
+    mov         $HEAP_TOP>>12,%rsi
+    jmp         2f
+1:  mov         %r8,%rsi
+    shr         $12,%rsi
+2:  add         $(16+4095),%rdi
+    shr         $12,%rdi
+    cmp         %rdi,%rsi
+    jb          1f
+    call        release_pages  
+1:  pop         %rsi
+    pop         %rdi
+
 
     // IF (PREVIOUS.inuse == 1 || No Previous)
 3:  cmp         $0,%r9
@@ -297,10 +323,6 @@ free:
     je          exitFree
     bt          $0,(%r8)
     jc          exitFree
-//cmp $0x6020,%di;jne 1f; int $3; 1:
-//mov (%r8),%rbx
-//int $3
-//jmp         exitFree
     // VICTIM.next = NEXT.next
     mov         8(%r8),%rax
     mov         %rax,8(%rdi)
