@@ -73,7 +73,7 @@ mainkernelthread:
 
     call    initKeyboard
     call    net_init
-/*    call    net_start
+    call    net_start
 
 
     mov     $0xC0A8011C,%rdi        // 192.168.1.28
@@ -89,7 +89,7 @@ mainkernelthread:
     mov     $0xC0A80101,%rdi
     mov     $0,%rsi
     call    net_setDefaultGateway
-*/
+
     mov     $4,%rdi             //4= virtio drive
     call    loadUserApplications
 
@@ -101,6 +101,8 @@ mainkernelthread:
     call    launchKernelThread
 
 1:
+    call    manageConsoles
+    call    manageDeadProcesses
     hlt
     jmp     1b
 
@@ -110,9 +112,4 @@ blockbuffer:
 mainkernelthread_end:
 
 
-// ====================== THIS IS A TEST THREAD
-tr2:
-    mov     %rdx,%rdi
-    call    testThread
-tr2_end:
 

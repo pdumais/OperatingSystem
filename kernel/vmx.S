@@ -291,7 +291,7 @@ init_vm_vmcs:
     call        vmx_set_control
 
     mov         $IA32_VMX_PROCBASED_CTLS2,%rcx
-    mov         $(1<<1|1<<5|1<<7),%rdi
+    mov         $(1<<1|1<<5|1<<7|1<<12|1<<20),%rdi
     mov         $VMCS_SECONDARY_VM_EXEC_CONTROL,%rdx
     call        vmx_set_control
 
@@ -358,6 +358,9 @@ init_vm_vmcs:
     VMWRITE($VMCS_GUEST_SYSENTER_ESP,$0)
     VMWRITE($VMCS_GUEST_SYSENTER_EIP,$0)
     VMWRITE($VMCS_GUEST_SYSENTER_CS,$0)
+
+    // VPID will be the same for all VCPUs. They each will be using a different EPT
+    VMWRITE($VMCS_VIRTUAL_PROCESSOR_ID,$242)
 
     // r15 contains the 4k-aligned base address of the guest'PML4
     or          $(0 | 3 << 3 | 1<< 6),%r15      // uncacheable, page-walk=3, dFlag.
