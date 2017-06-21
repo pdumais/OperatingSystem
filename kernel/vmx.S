@@ -477,12 +477,13 @@ resume_from_vmexit:
     pop         %rbx
     pop         %rax
     pop         %rbp
+
+    // We clear interrupts because we dont want
+    // a context switch to occur after vmresume if it fails.
     cli
     vmresume
-    mov         $0xE000001,%r15
     jc          1f
     vmlaunch
-    mov         $0xE000002,%r15
 1:  VMREAD($VMCS_VM_INSTRUCTION_ERROR)
     pushf
     pop         %rbx

@@ -35,8 +35,19 @@ startKernelThread:
     mov     $mainkernelthread,%rdi
     mov     $(mainkernelthread_end-mainkernelthread),%rsi
     call    launchKernelThread
+
     ret
 
+
+vmTest1:
+    mov     $0x10,%rdi
+    call    create_vm
+vmTest1_end:
+
+vmTest2:
+    mov     $0xB0,%rdi
+    call    create_vm
+vmTest2_end:
 
 //////////////////////////////////////////////
 //////////////////////////////////////////////
@@ -46,20 +57,7 @@ startKernelThread:
 // this thread serves no purpose, it's just to test if
 // I can launch a thread from another thread
 mainkernelthread:
-
-//mov $0x08000000,%rdi
-//call currentProcessVirt2phys
-//mov (%rdi),%rbx
-//mov 8(%rdi),%rcx
-//int $3
-
     call    createTextConsole
-
-
-    mov $7,%rax
-    mov $0,%rcx
-    cpuid
-    //int $3 
 
     call    initTestIPI
 
@@ -67,13 +65,16 @@ mainkernelthread:
     mov     $0,%rdi
     call    switchFrontLineProcessByIndex 
 
+
     call    initPCI
-    call    initKeyboard
-    call    net_init
-    call    net_start
 
     mov     $BLOCK_CACHE,%rdi        // blockNumber 242
     call    block_cache_init
+
+    call    initKeyboard
+    call    net_init
+/*    call    net_start
+
 
     mov     $0xC0A8011C,%rdi        // 192.168.1.28
     mov     $0xFFFFFF00,%rsi        // 255.255.255.0
@@ -88,63 +89,18 @@ mainkernelthread:
     mov     $0xC0A80101,%rdi
     mov     $0,%rsi
     call    net_setDefaultGateway
-
-
-
-
-
+*/
     mov     $4,%rdi             //4= virtio drive
     call    loadUserApplications
 
-//TEST
-mov     $0,%rdi
-mov     $0x4,%rsi
-mov     $KERNEL_BASE,%rdx
-mov     $1,%rcx  
-call    ip_send
+    mov     $vmTest1,%rdi
+    mov     $(vmTest1_end-vmTest1),%rsi
+    call    launchKernelThread
+    mov     $vmTest2,%rdi
+    mov     $(vmTest2_end-vmTest2),%rsi
+    call    launchKernelThread
 
-1:   
-    call    manageConsoles
-    call    manageDeadProcesses
-
-//mov $0xc093,%dx; inb %dx,%al; 
-//cmp $0,%al
-//je 343f
-//int $3
-//343:
-
-/*mov $INTA0_POLL_IN,%rax
-int $0xA0
-cmp $0,%rax
-jz 3f
-cmp $0x30,%al
-jne 4f
-call showMem
-jmp 3f
-4:
-cmp $0x31,%al
-jne 4f
-mov     $4,%rdi
-call    loadUserApplications
-4:
-cmp $'z',%al
-jne 4f
-call showIPITestResult
-4:
-cmp $'a',%al
-jne 4f
-call testIPI
-call showIPITestResult
-4:
-cmp $'2',%al
-jne 4f
-call  testGetTicksSinceBoot
-4:
-mov $teststr,%rdi
-mov %al,(%rdi)
-mov $INTA0_PRINTF,%rax
-int $0xA0
-3:*/
+1:
     hlt
     jmp     1b
 
@@ -152,7 +108,6 @@ blockbuffer:
     .skip (5*512)
 
 mainkernelthread_end:
-teststr: .ASCIZ "meow\r\n"
 
 
 // ====================== THIS IS A TEST THREAD

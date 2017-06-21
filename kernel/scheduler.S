@@ -731,6 +731,7 @@ schedulerHandler:
 1:  call        selectNextTask
     // At this point, rax=address of next task, rbx=index in table
 2:  PUSHAEXCEPTRAX                  // rax was pushed at handler entrance
+
     // This is bad for performance. Instead of looping through the list, the current thread
     // should remember its slot and and we could fetch it back right away
     mov         %cr3,%r15
@@ -747,6 +748,13 @@ schedulerHandler:
     // task is invalid (cpu parked or task killed)
     // then we should not save context
     ////////////////////////////////////////////////
+
+    // Flush current vmcs in case this thread is running a VM
+    mov         $PROCESS_VMCS,%rdi
+    cmpq        $0,(%rdi)
+    je          1f
+    vmclear     (%rdi)             
+1:
     mov         %rax,%rdi
     cmp         $0,%r14                     // current task does not exist (cpu parked?)
     jnz         justLoadTaskContext         // so don't save context
@@ -759,7 +767,7 @@ schedulerHandler:
     mov         8(%rdi),%rsp                // rsp value when task switch occured
     STRIPCONTROLFROMCR3(%r8)
     mov         %r8,%cr3
-    lock btrq   $TASK_RUNNING_BIT,(%r15)                   // Now we write back the old task entry
+    lock btrq   $TASK_RUNNING_BIT,(%r15)    // Now we write back the old task entry
                                             //  with the "not-running" flag.
                                             //  we waited until we updated cr3
                                             //  so that we can guarantee that
@@ -792,10 +800,16 @@ contextSwitchDone:
     mov     $TIME_SLICE_COUNT,%rax
     movq    $TASK_QUANTUM_COUNTER,(%rax)
 
-    POPA
+    // Restore process's VMCS
+    mov     $PROCESS_VMCS,%rax
+    cmp     $0,(%rax)
+    je      1f
+    vmptrld (%rax)
+1:  POPA
     call        ackAPIC
     iretq
-   
+
+
 noTaskSwitch:
     // At this point, we found no next task to execute. Only possible
     // explanation is that there are less tasks than the number of CPUs.
@@ -816,6 +830,7 @@ noTaskSwitch:
     movq        $TASK_QUANTUM_COUNTER,(%rax)
     cmp         $0,%r14                
     jnz         parkCPU 
+
     POPA
     call        ackAPIC
     iretq

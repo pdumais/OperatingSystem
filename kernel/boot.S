@@ -60,7 +60,6 @@ main:
     rdmsr
     bt      $8,%eax//if bit 8 of eax is set, it measn this is the boostrap processor
     jc      isBST
-    
     call    enableLongMode
     ljmpl   $0x18,$longmodeAP
 
@@ -178,6 +177,9 @@ longmodeAP:
     call    enableAVX
     call    initAPICTimer
 
+    // we need to init the hypervisor on every core
+    call    init_hypervisor
+
     // Wait for BST to be ready before enabling interrupts and starting scheduler.
 1:  btq     $0,WAITFORBST
     jc      1b
@@ -196,6 +198,9 @@ longmode:
 
     call    initSMPForBST
     call    initAPICTimer
+
+    // we need to init the hypervisor on every core
+    call    init_hypervisor
 
     call    initHardware
     call    init_memory_pools

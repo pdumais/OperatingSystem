@@ -1,3 +1,23 @@
+- hypervisor
+    publish entire code base on github
+        link to it in article
+    advertise on osdev    
+    enable vpid with vpid==1
+
+    event injection
+        reflecting exceptions and interrupts to VM: 31.7
+        transparently inject back all exceptions inside VM and do VMRESUME
+
+    invalidate EPT tlb entries:
+        on guest-physical remapping, invalidate EPT on all other host CPUs.
+        when destroying a VM, invalidate all mappings for that EPT
+        emulate guest invlpg and invpcid
+
+    multiple vcpu
+    virtual apic
+    virtio device
+    bios
+
 - memory:
     free:
         When the process starts, it's heap is just a big chunk of unallocated memory.
@@ -53,9 +73,6 @@
 - usb driver
 - disk should be partitioned with MBR
     bootloader in MBR and kernel in partition 1   
-- virtualization (nested virtualization??)
-    - vmx
-        - load vmcs with long mode data. boot a vm in long mide
 ======================================================================================
 document:
     block cache (and why ssd would become irrelevant)

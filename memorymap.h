@@ -13,8 +13,8 @@
 #define RESERVED2END    0x00001FFF      
 #define SMP_TRAMPOLINE  0x00002000      // needs to be aligned on a 4k page 
 #define IPI_MESSAGES    0x00002100
-#define RESERVED4       0x00002300
-#define RESERVED4END    0x00005FFF
+#define VMINFOS         0x00002300
+#define VMINFOSEND      0x00006000
 
 #define IDTSPACE        0x00006000
 #define RESERVED1       0x00007000
@@ -60,6 +60,7 @@
 // file handles are stored as linked list at this address
 #define FILE_HANDLE_ADDRESS (CONSOLE_POINTER+8)
 #define PROCESS_HEAP_ADDRESS (FILE_HANDLE_ADDRESS+8)
+#define PROCESS_VMCS (PROCESS_HEAP_ADDRESS+8)
 
 
 #define IDENTITY_MAPPING   0x4000000000
