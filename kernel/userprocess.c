@@ -87,6 +87,7 @@ void createUserProcess(struct UserProcessInfo* upi)
     stack[-18] = 0;                                     // r13
     stack[-19] = 0;                                     // r14
     stack[-20] = 0;                                     // r15
+    stack[-21] = -1;                                    // VMCS
 
 }
 

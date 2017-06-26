@@ -5,6 +5,7 @@
 #define CODE_ADDRESS_PAGE_TABLE_OFFSET (((((THREAD_CODE_START-KERNEL_RESERVED_END))>>12)<<3))
 #define STALL() 1337: hlt; jmp 1337b;
 
+
 // Addresses starting at 0x4000000000 mirrors physical memory. So these addresses
 // are usefull when wanting to bypass physical mapping
 #define MIRROR(x) (((uint64_t)x)|0x4000000000)

@@ -217,25 +217,30 @@
 
 
 
-
+#define VMINFO_VMCS_COUNT   32
 #ifdef __ASSEMBLER__
 #define VMINFO_FLAGS        0
-#define VMINFO_VMCS         8
-#define VMINFO_PML4         16
-#define VMINFO_MEMORY_LOCK  24
+#define VMINFO_PML4         8
+#define VMINFO_MEMORY_LOCK  16
+#define VMINFO_VAPIC_PAGE   24
+#define VMINFO_META         32
+#define VMINFO_VMCS         40
 
-#define VMINFO_SIZE         32
+#define VMINFO_SIZE         (40+(VMINFO_VMCS_COUNT*8))
 #else
 
 typedef struct
 {
     uint64_t flags;
-    uint64_t* vmcs;
     uint64_t* pml4;
     uint64_t  memory_lock;
+    uint64_t* vapic_page;
+    uint64_t meta;
+    uint64_t* vmcs[VMINFO_VMCS_COUNT];
 } vminfo;
 
 #define VMINFO_SIZE         (sizeof(vminfo))
 
 #endif
+
 

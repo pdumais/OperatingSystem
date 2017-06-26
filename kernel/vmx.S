@@ -2,6 +2,7 @@
 #include "vmx.h"
 #include "../memorymap.h"
 
+
 #define VMWRITE(A,B)  mov B,%rbx; mov A,%rax; vmwrite %rbx,%rax
 #define VMREAD(A)  mov A,%rbx; vmread %rbx,%rax
 
@@ -24,6 +25,42 @@ get_revision_id:
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
+// Function: add_vmcs_to_vminfo(%rdi=vminfo, %rsi=vmcs)
+//
+// Note: This function is multi-processor safe
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+add_vmcs_to_vminfo:
+    push        %rdi
+    push        %rsi
+    push        %rax
+    push        %rcx
+
+    mov         $(VMINFO_VMCS_COUNT+1),%rcx
+    btr         $38,%rsi                // to physical address
+
+    add         $VMINFO_VMCS,%rdi
+1:  mov         (%rdi),%rax
+    add         $8,%rdi
+    dec         %rcx
+    jz          vmcs_list_full    
+    cmp         $0,%rax
+    jne         1b
+    lock cmpxchg %rsi,-8(%rdi)
+    jnz         1b              //cmpxchg failed if z=0
+
+    pop         %rcx
+    pop         %rax
+    pop         %rsi
+    pop         %rdi
+    ret
+
+vmcs_list_full:
+    int         $3
+
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 // Function: reserve_vminfo()
 // Returns rax=vminfo pointer
 //
@@ -32,6 +69,7 @@ get_revision_id:
 ////////////////////////////////////////////////////////////////////////////////////
 reserve_vminfo:
     push        %rcx
+    push        %rdi
 
     mov         $VMINFOS,%rax
     mov         $((VMINFOSEND-VMINFOS)/VMINFO_SIZE),%rcx
@@ -49,7 +87,18 @@ vminfo_full:
 vminfo_found:
     xor         %rcx,%rcx
     mov         %rcx,VMINFO_MEMORY_LOCK(%rax)
-1:  pop         %rcx
+
+    // Clear the VMCS list
+    mov         $VMINFO_VMCS_COUNT,%rcx
+    mov         %rax,%rdi
+    add         $VMINFO_VMCS,%rdi
+    push        %rax
+    xor         %rax,%rax
+    rep         stosq
+    pop         %rax
+
+1:  pop         %rdi
+    pop         %rcx
     ret
 
 
@@ -66,14 +115,18 @@ setup_vm_bootstrap:
     push        %rsi
     push        %rdx
 
-    mov         %rdi,%rdx
+    push        %rdi
+    call        ept_init_static_pages
+    pop         %rdx
+
+    // Allocate 2 4k page in the guest so we can copy code in it.
     mov         $0,%rdi
-    mov         $1,%rsi
+    mov         $2,%rsi
     call        ept_allocate_pages
 
     mov         $vm_bootstrap,%rsi
     mov         %rax,%rdi
-    mov         $(4096/8),%rcx
+    mov         $((4096*2)/8),%rcx
     rep         movsq
 
     pop         %rdx
@@ -151,32 +204,120 @@ vmxon_fail:
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-//  Function: create_vm(rdi=metadata)
+//  Function: create_vm(%rdi=number_of_vcpu,rsi=param_for_thread)
 //  
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+create_vm:
+    push        %rdi
+    push        %rsi
+    push        %rdx
+    push        %rcx
+    push        %rbx
+
+    // Save the vCPU count in rcx so we can loop later
+    mov         %rdi,%rcx
+
+    // Create the VMINFO structure
+    call        reserve_vminfo
+    cmp         $0,%rax
+    jnz         1f
+    int         $3
+1:  mov         %rsi,VMINFO_META(%rax)
+    push        %rax
+    
+    // Create the EPT and store the pointer in the VMINFO structure
+    mov         $1,%rdi
+    mov         %rax,%rsi
+    call        create_ept
+    pop         %rdx          //rdx=param for thread in launchKernelThread
+                              // in this case, we pass in the vminfo
+
+    mov         $new_vcpu_thread,%rdi
+    mov         $(new_vcpu_thread_end-new_vcpu_thread),%rsi
+    push        %rcx
+create_vcpus:
+    call        launchKernelThread
+    loop        create_vcpus
+    pop         %rcx
+
+    // Now wait until all VMCS are created and added in the list before 
+    // we start the first vCPU
+    // index_of_last_cpu = (cpu_count-1)*8
+    dec         %rcx
+    shl         $3,%rcx     
+    add         $VMINFO_VMCS,%rdx
+    add         %rdx,%rcx
+
+1:  cmpq        $0,(%rcx)
+    je          1b
+
+    // At this point, we know all vCPUs are created
+    mov         (%rdx),%rdx
+    bts         $38,%rdx
+    movl        $0,4(%rdx)
+
+    pop         %rbx
+    pop         %rcx
+    pop         %rdx
+    pop         %rsi
+    pop         %rdi
+    ret
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+//  Function: new_vcpu_thread
+//  This is a thread that will be launched for a VCPU
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+new_vcpu_thread:
+    // rdx is the metadata that is passed in the new thread. it can
+    // be used for anything.
+
+    mov     %rdx,%rdi
+    call    create_vcpu
+    int     $3      //create_vcpu should never return
+new_vcpu_thread_end:
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+// Function: create_ept(rdi=gig_count, rsi=vminfo_structure)
+// Creates an EPT structure for 'gig_count' gigabytes of RAM
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+create_ept:
+    call        ept_setup_guest_memory //returns PML4 in rax
+    mov         %rax,VMINFO_PML4(%rsi)
+
+    mov         %rsi,%rdi
+    call        setup_vm_bootstrap
+    ret
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+//  Function: create_vcpu(rdi=vminfo)
+//
 //  This function will never return. It will launch a VM and execute code from there.
 //  Upon vmexit, a handler will be called and will execute in the same task context
 //  that created the VM
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-create_vm:
-    push        %rdi
+create_vcpu:
+    mov         VMINFO_META(%rdi),%rax
+    push        %rax                // metadata passed to create_vm
+    mov         %rdi,%r14
+
     //This function will never return, so no need to maintain a stack
 
     // we disable interrupts because we don't wanna be preempted by setting
     // up the VMCS
     cli
 
-    call        reserve_vminfo
-    cmp         $0,%rax
-    jnz         1f
-    int         $3
-1:  mov         %rax,%r14
-
     // Reserve a physical page for the VMCS and clear it.
     mov         $1,%rdi
     call        kernelAllocPages
     mov         %rax,%rdi
-    mov         %rax,VMINFO_VMCS(%r14)
+
+    // clear vmcs
     push        %rdi
     mov         $0,%rax
     mov         $(4096/8),%rcx
@@ -193,34 +334,60 @@ create_vm:
     jbe         vm_create_failed
     vmptrld     (%rax)
     jbe         vm_create_failed
-    
-    mov         $1,%rdi             // 1 gig
-    call        ept_setup_guest_memory //returns PML4 in rax
-    mov         %rax,%rdi
-    mov         %rax,VMINFO_PML4(%r14)
+
+
+    mov         VMINFO_PML4(%r14),%rdi
     btrq        $38,%rdi            // to phys address
     call        init_vm_vmcs
 
-    mov         %r14,%rdi
-    call        setup_vm_bootstrap
-
-    pop         %rdi                //metadata to be handed to VM
+    pop         %rdi                    //metadata to be handed to VM
 
     // We push the vminfo address on the stack so it is available on vmexits
     push        %r14
     VMWRITE($VMCS_HOST_RSP,%rsp)
 
-    // We don't need to re-enable interrupts because they will still trigger
-    // a VMExit and we will re-enable them so we can process them at that time.
-    vmlaunch
+    // We are done using the VMCS so we release it because
+    // another CPU might write to it when we add it in the 
+    // VM's vcpu list
+    mov         $PROCESS_VMCS,%rax
+    vmclear     (%rax)
 
+    // add VMCS in vmcs list of vminfo
+    push        %rdi
+    mov         (%rax),%rsi         // VMCS
+    bts         $38,%rsi
+    movl        $0xDEADBEEF,4(%rsi) // set as pending-start
+    btr         $38,%rsi
+    mov         %r14,%rdi           //vminfo
+    call        add_vmcs_to_vminfo
+    pop         %rdi
+
+    // Now we are ready to launch the VCPU. But we check if the 
+    // state is 0 first. If not, then it is not ready to start
+    // all CPU will wait before starting until all vCPUs are created
+    // in the VM.
+    sti
+check_vm_state:
+    mov         $PROCESS_VMCS,%rax
+    mov         (%rax),%rbx
+    bts         $38,%rbx
+    cmpl        $0,4(%rbx)
+    je          launchvm
+    call        yield
+    jmp         check_vm_state
+launchvm:
+    vmptrld     (%rax)
+    vmlaunch
     // if we get here, it means vmlaunch failed
+    mov         $0x6666666666,%r15
+
 vm_create_failed:
+    sti
     pushf
     pop         %rax
     mov         $VMCS_VM_INSTRUCTION_ERROR,%rdx
     vmread      %rdx,%rdx
-    mov         $0x242242,%rax
+    mov         $0x242242,%rcx
     int $3
     //This function will never return. No need to clear the stack
 
@@ -291,9 +458,10 @@ init_vm_vmcs:
     call        vmx_set_control
 
     mov         $IA32_VMX_PROCBASED_CTLS2,%rcx
-    mov         $(1<<1|1<<5|1<<7|1<<12|1<<20),%rdi
+    mov         $(1<<0|1<<1|1<<5|1<<7|1<<20),%rdi
     mov         $VMCS_SECONDARY_VM_EXEC_CONTROL,%rdx
     call        vmx_set_control
+
 
     mov         $IA32_VMX_EXIT_CTLS,%rcx
     mov         $(1<<9),%rdi
@@ -358,9 +526,18 @@ init_vm_vmcs:
     VMWRITE($VMCS_GUEST_SYSENTER_ESP,$0)
     VMWRITE($VMCS_GUEST_SYSENTER_EIP,$0)
     VMWRITE($VMCS_GUEST_SYSENTER_CS,$0)
+    VMWRITE($VMCS_GUEST_ACTIVITY_STATE,$0)  //TODO
+    //VMWRITE($VMCS_GUEST_ACTIVITY_STATE,$3)  //wait-for-sipi
+
 
     // VPID will be the same for all VCPUs. They each will be using a different EPT
     VMWRITE($VMCS_VIRTUAL_PROCESSOR_ID,$242)
+
+    call        get_apic_address
+    VMWRITE($VMCS_APIC_ACCESS_ADDR,%rax)
+    mov         %rsi,%rax
+    btr         $38,%rax
+    VMWRITE($VMCS_VIRTUAL_APIC_PAGE_ADDR,%rax)
 
     // r15 contains the 4k-aligned base address of the guest'PML4
     or          $(0 | 3 << 3 | 1<< 6),%r15      // uncacheable, page-walk=3, dFlag.
@@ -391,13 +568,34 @@ vmx_basic_supported:
     // bit 63:32 -> allowed 1-settings (if 0, then not allowed to set to 1
     pop         %rcx
     rdmsr
-    shr         $32,%rcx
     and         %rdx,%rdi  //rdx contains the required 0 (if edx[x]==0 -> reserved 0
     or          %rdi,%rax  //rax contains the required 1 (if eax[x]==1 -> reserved 1
     pop         %rdx
     push        %rax
     VMWRITE(%rdx,%rax)
     pop         %rax
+    ret
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+// Function: adjust_guest_rip_after_fault
+// 
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+adjust_guest_rip_after_fault:
+    push        %r15
+    push        %rax
+    push        %rbx
+
+    VMREAD($VMCS_VM_EXIT_INSTRUCTION_LEN)
+    mov         %rax,%r15
+    VMREAD($VMCS_GUEST_RIP)
+    add         %r15,%rax
+    VMWRITE($VMCS_GUEST_RIP,%rax)
+
+    pop         %rbx
+    pop         %rax
+    pop         %r15
     ret
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -425,14 +623,77 @@ vm_exit_handler:
     je          handle_vm_halt
     cmp         $EXIT_REASON_EPT_VIOLATION,%rax
     je          handle_ept_violation
+    cmp         $EXIT_REASON_APIC_ACCESS,%rax
+    je          handle_apic_access
+    cmp         $EXIT_REASON_VMCALL,%rax
+    je          handle_vmcall
 
 ////// UNHANDLED VM EXIT
     mov         $0x111111112222220,%r15
     int         $3
 
+
+////// VMCALL
+handle_vmcall:
+    // Since vmcall is a fault, we must increase guest's RIP
+    call        adjust_guest_rip_after_fault
+
+    cmp         $1,%rdx
+    je          handle_vmcall_sipi
+
+    int         $3
+
+handle_vmcall_sipi:
+    // we need interrupts cleared because we temporarily execute VMPTRLD
+    // and a context switch would reset back our own VMCS
+    cli
+    // The VMM sets all AP's VMCS field "abort" to 0xDEADBEEF when they 
+    // are pending start, so we must clear them now to indicate they are ready
+    // Note that this field is allowed to be written to directly without
+    // VMWRITE
+    push        %rcx
+    mov         $PROCESS_VMCS,%rcx
+    vmclear     (%rcx)
+
+    add         $VMINFO_VMCS,%rbp
+    mov         $VMINFO_VMCS_COUNT,%rcx
+1:  mov         (%rbp),%rcx   //VMCS
+    cmp         $0,%rcx       // is it a null entry?
+    je          2f            //  if yes then we reached end of list
+    bts         $38,%rcx
+    cmpl        $0xDEADBEEF,4(%rcx)    // waiting for startup?
+    jne         3f          // if not then no processing is needed
+
+    vmptrld     (%rbp)
+    shl         $32,%rdi
+    shr         $32,%rdi
+    VMWRITE($VMCS_GUEST_RIP,%rdi)
+    vmclear     (%rbp)
+    movl        $0,4(%rcx)
+3:  add         $8,%rbp
+    loop        1b
+    
+2:  mov         $PROCESS_VMCS,%rcx
+    vmptrld     (%rcx)
+
+    jbe         handle_vmcall_sipi_error
+    pop         %rcx
+    jmp         resume_from_vmexit
+handle_vmcall_sipi_error:
+    int         $3
+
+
+
+////// APIC ACCESS
+handle_apic_access:
+    VMREAD($VMCS_VIRTUAL_APIC_PAGE_ADDR)
+    mov         %rax,%rbp
+    bts         $38,%rbp 
+    VMREAD($VMCS_EXIT_QUALIFICATION)
+    int         $3
+
 ////// EXTERNAL INTERRUPT
 handle_external_interrupt:
-    //VMREAD($VMCS_IDT_VECTORING_INFO_FIELD)
     sti
     jmp         resume_from_vmexit
 
@@ -449,7 +710,7 @@ handle_ept_violation:
 // a new page.
 handle_ept_violation_write:
     VMREAD($VMCS_GUEST_PHYSICAL_ADDRESS)
-
+    
     push        %rdi
     push        %rsi
     push        %rdx
@@ -484,11 +745,13 @@ resume_from_vmexit:
     // We clear interrupts because we dont want
     // a context switch to occur after vmresume if it fails.
     cli
+
     vmresume
     jc          1f
     vmlaunch
 1:  VMREAD($VMCS_VM_INSTRUCTION_ERROR)
     pushf
     pop         %rbx
+    mov         $0x111111112222223,%r15
     int         $3
 

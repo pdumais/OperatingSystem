@@ -39,15 +39,6 @@ startKernelThread:
     ret
 
 
-vmTest1:
-    mov     $0x10,%rdi
-    call    create_vm
-vmTest1_end:
-
-vmTest2:
-    mov     $0xB0,%rdi
-    call    create_vm
-vmTest2_end:
 
 //////////////////////////////////////////////
 //////////////////////////////////////////////
@@ -93,12 +84,13 @@ mainkernelthread:
     mov     $4,%rdi             //4= virtio drive
     call    loadUserApplications
 
-    mov     $vmTest1,%rdi
-    mov     $(vmTest1_end-vmTest1),%rsi
-    call    launchKernelThread
-    mov     $vmTest2,%rdi
-    mov     $(vmTest2_end-vmTest2),%rsi
-    call    launchKernelThread
+
+    mov     $0xA60,%rsi
+    mov     $6,%rdi
+    call    create_vm
+    mov     $0xB00,%rsi
+    mov     $6,%rdi
+    call    create_vm
 
 1:
     call    manageConsoles

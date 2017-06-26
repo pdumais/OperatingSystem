@@ -13,10 +13,14 @@ Specifications:
     supports PCID and does TLB shootdowns
     supports sending IPIs and registering custom handlers
     supports RTL8139 netcard on PCI bus
-    on main thread:
-        pressing '0' shows mem, pressing '1' launches bootscript
+    supports virtio block device and virtio net device.
     networking works but not fully tested
-        - can receive connection and establish one
+        - can receive TCP connection and establish one
         - send/rcv
-        - so failure testing
-
+        - no failure testing
+    basic hypervisor
+        CPU virtualization with VMX
+        no BIOS
+        no virtual devices
+        no emulation of A20M
+        

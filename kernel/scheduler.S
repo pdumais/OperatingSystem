@@ -145,7 +145,7 @@ launchSoftIRQThread:
     call    createKernelThread
     mov     $SOFTIRQTASKINFO,%rax
     mov     %rdi,(%rax)
-    movq    $STACK0TOP_VIRTUAL_ADDRESS-160,%rdi
+    movq    $STACK0TOP_VIRTUAL_ADDRESS-168,%rdi
     mov     %rdi,8(%rax)
     btsq    $TASK_ENABLE_BIT,(%rax)                  // enable the task now
 
@@ -161,8 +161,10 @@ launchSoftIRQThread:
 ////////////////////////////////////////////////////////////////////////////////////
 launchKernelThread:
     push    %rdi
+    push    %rsi
     call    createKernelThread
     call    addTaskInList
+    pop     %rsi
     pop     %rdi
     ret
 
@@ -274,6 +276,7 @@ createKernelThread:
     movq    $0,-144(%rdi)    /* r13 */
     movq    $0,-152(%rdi)    /* r14 */
     movq    $0,-160(%rdi)    /* r15 */
+    movq    $-1,-168(%rdi)    /* VMCS */
 
     //  find first non-zero entry in task list
     //  Each tasklist entry is 16bytes long (128bit)
@@ -408,7 +411,7 @@ addTaskInList:
     je      4f
     add     $16,%r8
     cmp     %r8,%rcx
-    je      3f
+    je      addTaskError
     jmp     2b
 4:
     // we are going to store the PML4 address (in rdi) in the task slot
@@ -449,7 +452,7 @@ addTaskInList:
 #endif
 
 
-    movq    $STACK0TOP_VIRTUAL_ADDRESS-160,%rbx
+    movq    $STACK0TOP_VIRTUAL_ADDRESS-168,%rbx
     mov     %rbx,8(%r8)
     mov     (%r8),%rbx
     btsq    $TASK_ENABLE_BIT,%rbx
@@ -729,8 +732,19 @@ schedulerHandler:
     iretq
 
 1:  call        selectNextTask
-    // At this point, rax=address of next task, rbx=index in table
+    // At this point, rax=address of next task
 2:  PUSHAEXCEPTRAX                  // rax was pushed at handler entrance
+
+    // Flush current vmcs in case this thread is running a VM
+    mov         %rsp,%rdi
+    sub         $8,%rdi
+    vmptrst     (%rdi)
+    mov         (%rdi),%r15
+    push        %r15                // now VMCS is pushed in context
+    cmpq        $-1,(%rdi)
+    je          1f
+    vmclear     (%rdi)
+1:
 
     // This is bad for performance. Instead of looping through the list, the current thread
     // should remember its slot and and we could fetch it back right away
@@ -748,13 +762,6 @@ schedulerHandler:
     // task is invalid (cpu parked or task killed)
     // then we should not save context
     ////////////////////////////////////////////////
-
-    // Flush current vmcs in case this thread is running a VM
-    mov         $PROCESS_VMCS,%rdi
-    cmpq        $0,(%rdi)
-    je          1f
-    vmclear     (%rdi)             
-1:
     mov         %rax,%rdi
     cmp         $0,%r14                     // current task does not exist (cpu parked?)
     jnz         justLoadTaskContext         // so don't save context
@@ -801,11 +808,13 @@ contextSwitchDone:
     movq    $TASK_QUANTUM_COUNTER,(%rax)
 
     // Restore process's VMCS
-    mov     $PROCESS_VMCS,%rax
-    cmp     $0,(%rax)
-    je      1f
-    vmptrld (%rax)
-1:  POPA
+    mov         %rsp,%rdi
+    cmp         $-1,(%rdi)
+    je          1f
+    vmptrld     (%rdi)
+    jbe         cant_restore_vmcs
+1:  add         $8,%rsp         // remove VMCS
+    POPA
     call        ackAPIC
     iretq
 
@@ -831,9 +840,17 @@ noTaskSwitch:
     cmp         $0,%r14                
     jnz         parkCPU 
 
+    mov         %rsp,%rdi
+    cmp         $-1,(%rdi)
+    je          1f
+    vmptrld     (%rdi)
+    jbe         cant_restore_vmcs
+1:  add         $8,%rsp     
     POPA
     call        ackAPIC
     iretq
+cant_restore_vmcs:
+    int         $3
 
 parkCPU:
     // Set back the kernel page tables, 

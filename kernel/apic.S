@@ -12,11 +12,12 @@
 .global sendIPI
 .global registerIPIHandler
 .global smpUp
+.global get_apic_address
 
 .extern markPageAsInUse
 .extern schedulerHandler
 
-
+#define APIC_BASE_MSR                       0x1B
 #define APIC_REG_ID                         0x0020
 #define APIC_REG_VERSION                    0x0030
 #define APIC_REG_TASKPRIORITY               0x0080
@@ -1182,6 +1183,23 @@ registerIPIHandler:
 ////////////////////////////////////////////////////////////////////////////////////
 smpUp:
     bts         $0,SMPISUP
+    ret
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+// Function: get_apic_address()
+// returns the APIC physical address 
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+get_apic_address:
+    push        %rcx
+    push        %rdx
+    mov         $APIC_BASE_MSR,%rcx
+    rdmsr
+    shr         $12,%rax
+    shl         $12,%rax
+    pop         %rdx
+    pop         %rcx
     ret
     
 
