@@ -271,6 +271,13 @@ create_vcpus:
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 new_vcpu_thread:
+   /* push    %rdx
+    call    createTextConsole
+    pop     %rdx
+
+mov $0xB8000,%rdi
+movb $'A',(%rdi)*/
+
     // rdx is the metadata that is passed in the new thread. it can
     // be used for anything.
 
@@ -664,10 +671,10 @@ handle_vmcall_sipi:
     cmpl        $0xDEADBEEF,4(%rcx)    // waiting for startup?
     jne         3f          // if not then no processing is needed
 
+    // high 32bits of rdi should be cleared 
+    // but need to confirm this
     vmptrld     (%rbp)
-    shl         $32,%rdi
-    shr         $32,%rdi
-    VMWRITE($VMCS_GUEST_RIP,%rdi)
+    VMWRITE($VMCS_GUEST_RIP,%rdi)   
     vmclear     (%rbp)
     movl        $0,4(%rcx)
 3:  add         $8,%rbp

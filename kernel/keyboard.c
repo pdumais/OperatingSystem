@@ -2,7 +2,7 @@
 #include "utils.h"
 #include "../memorymap.h"
 #include "includes/kernel/types.h"
-#include "display.h"
+#include "printf.h"
 // http://www.computer-engineering.org/ps2keyboard/scancodes1.html
 
 extern void getInterruptInfoForBus(unsigned long bus, unsigned int* buffer);

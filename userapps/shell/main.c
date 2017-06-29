@@ -30,7 +30,7 @@ void processCommand()
     else if (strcompare(cmd,"load"))
     {
         char fname[255];
-        strcpy("01:/",fname);
+        strcpy("04:/",fname);
         strcpy(params,(char*)&fname[4]);
         printf("Loading [%s]\r\n",fname);
         uint64_t pid = loadProcess(fname);
@@ -60,7 +60,7 @@ int main(uint64_t param)
     {
         ch = poll_in();
 
-        if ((ch>='0' && ch<='9')||(ch>='a' && ch<='z')||(ch>='A' && ch<='Z')||(ch==' ')) 
+        if ((ch>='0' && ch<='9')||(ch>='a' && ch<='z')||(ch>='A' && ch<='Z')||(ch==' ')||(ch=='.')) 
         {
             if (cmdIndex <255)
             {

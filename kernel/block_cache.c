@@ -2,7 +2,7 @@
 #include "block_cache.h"
 #include "../memorymap.h"
 #include "utils.h"
-#include "display.h"
+#include "printf.h"
 
 // if increasing that value, make sure the space allocated in memorymap is still valid
 #define CACHE_SIZE 128

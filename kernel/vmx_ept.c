@@ -99,8 +99,8 @@ void ept_init_static_pages(vminfo* vm)
 {
     //TODO: this is just for debugging, remove that.
     ept_map_pages(0xB8000, 0xB8000, 1, vm);
-    uint64_t apic_base = get_apic_address();
-    ept_map_pages(VAPIC_GUEST_ADDRESS,apic_base, 1, vm);
+//    uint64_t apic_base = get_apic_address();
+//    ept_map_pages(VAPIC_GUEST_ADDRESS,apic_base, 1, vm);
 }
 
 uint64_t* ept_allocate_pages(uint64_t vm_start_address, uint64_t page_count, vminfo* vm)

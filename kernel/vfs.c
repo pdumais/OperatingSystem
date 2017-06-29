@@ -2,7 +2,7 @@
 #include "flatfs.h"
 #include "../memorymap.h"
 #include "memorypool.h"
-#include "display.h"
+#include "printf.h"
 #include "utils.h"
 
 void add_file_handle_to_list(file_handle* f);

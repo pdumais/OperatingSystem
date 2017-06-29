@@ -1,3 +1,4 @@
+#pragma once
 #include "includes/kernel/types.h"
 #define MAX_MEMORY_POOLS 50
 

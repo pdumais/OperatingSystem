@@ -1,6 +1,6 @@
 #include "../memorymap.h"
 #include "config.h"
-#include "display.h"
+#include "printf.h"
 
 extern unsigned long ioAPICGetRedirect(unsigned long index);
 extern void getInterruptInfoForBus(unsigned long bus, unsigned int* buffer);

@@ -1,7 +1,7 @@
 #include "virtio.h"
 #include "macros.h"
 #include "../memorymap.h"
-#include "display.h"
+#include "printf.h"
 #include "utils.h"
 #include "netcard.h"
 #include "includes/kernel/types.h"

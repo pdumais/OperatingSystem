@@ -1,5 +1,5 @@
 #include "includes/kernel/types.h"
-#include "display.h"
+#include "printf.h"
 #include "../memorymap.h"
 #include "userprocess.h"
 

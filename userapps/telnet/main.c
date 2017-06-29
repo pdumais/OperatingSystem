@@ -10,8 +10,8 @@ int main(uint64_t param)
 
     socket* s = create_socket();
 
-    uint32_t ip = 0x0301A8C0;    
-    connect(s,ip,80);
+    uint32_t ip = 0xFB01A8C0;    
+    connect(s,ip,23);
 
     char r=0;
     while (!r) r = isconnected(s);

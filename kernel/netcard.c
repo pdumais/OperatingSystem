@@ -1,6 +1,6 @@
 #include "ip.h"
 #include "netcard.h"
-#include "display.h"
+#include "printf.h"
 #include "utils.h"
 #include "config.h"
 

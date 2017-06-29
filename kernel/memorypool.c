@@ -1,5 +1,5 @@
 #include "memorypool.h"
-#include "display.h"
+#include "printf.h"
 extern void memclear64(void* destination, uint64_t size);
 extern void spinLock(uint64_t*);
 extern void spinUnlock(uint64_t*);

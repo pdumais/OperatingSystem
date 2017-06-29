@@ -3,7 +3,7 @@
 #include "ip.h"
 #include "netcard.h"
 #include "memorypool.h"
-#include "display.h"
+#include "printf.h"
 #include "includes/kernel/hashtable.h"
 
 #define EPHEMERAL_START 32768

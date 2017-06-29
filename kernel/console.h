@@ -1,12 +1,12 @@
 #include "includes/kernel/types.h"
 #include "includes/kernel/systemhandle.h"
+#include "video.h"
 
 //WARNING: struct should be bigger than 4k
 struct ConsoleData
 {
     system_handle   handle;
 
-    char        backBuffer[4096]; //TODO should be smaller
     uint64_t    streamPointer; 
     uint64_t    backBufferPointer; 
     char        streamBuffer[512];
@@ -16,6 +16,7 @@ struct ConsoleData
     uint64_t    owningProcess;
     uint64_t    previousOwningProcess;
     uint64_t    lock;
+    Screen*     screen;
     void        (*flush_function)();
     char        ansiData[8];
     uint8_t     ansiIndex;
@@ -28,3 +29,4 @@ uint16_t pollChar();
 
 void flushTextVideo();
 void streamCharacters(char* str);
+Screen* getDirectVideo();

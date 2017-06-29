@@ -1,5 +1,5 @@
 #include "utils.h"
-#include "display.h"
+#include "printf.h"
 #include "netcard.h"
 
 extern void memcpy64(char* src, char* dst, unsigned long size);

@@ -1,5 +1,5 @@
 #include "netcard.h"
-#include "display.h"
+#include "printf.h"
 #include "utils.h"
 
 extern struct NetworkConfig* net_getConfig(unsigned char index);

@@ -48,6 +48,7 @@ startKernelThread:
 // this thread serves no purpose, it's just to test if
 // I can launch a thread from another thread
 mainkernelthread:
+
     call    createTextConsole
 
     call    initTestIPI
@@ -86,11 +87,11 @@ mainkernelthread:
 
 
     mov     $0xA60,%rsi
-    mov     $6,%rdi
+    mov     $1,%rdi
     call    create_vm
-    mov     $0xB00,%rsi
-    mov     $6,%rdi
-    call    create_vm
+//    mov     $0xB00,%rsi
+//    mov     $6,%rdi
+//    call    create_vm
 
 1:
     call    manageConsoles

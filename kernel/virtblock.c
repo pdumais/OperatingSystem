@@ -2,7 +2,7 @@
 #include "virtio.h"
 #include "macros.h"
 #include "utils.h"
-#include "display.h"
+#include "printf.h"
 
 #define VIRTIO_BLK_F_SIZE_MAX 1
 #define VIRTIO_BLK_F_SEG_MAX 2

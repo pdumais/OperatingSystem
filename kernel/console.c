@@ -1,4 +1,4 @@
-#include "display.h"
+#include "printf.h"
 #include "keyboard.h"
 #include "utils.h"
 #include "console.h"
@@ -71,51 +71,21 @@ if (((uint64_t)cd->flush_function)<100) __asm("int $3" : : "a"(cd->flush_functio
     } 
 }
 
-void scroll(char* buffer)
+void scroll(char* buffer,uint32_t w, uint32_t h)
 {
-    memcpy64((char*)&buffer[160],(char*)&buffer[0],(80*(25-1)*2));
-    memclear64((char*)&buffer[2*80*(25-1)],2*80);
+    memcpy64((char*)&buffer[w*2],(char*)&buffer[0],(w*(h-1)*2));
+    memclear64((char*)&buffer[2*w*(h-1)],2*w);
 }
 
-void increaseBufferPointer(struct ConsoleData* cd, uint64_t count, char* buffer)
+void increaseBufferPointer(struct ConsoleData* cd, uint64_t count, char* buffer,uint32_t w, uint32_t h)
 {
     cd->backBufferPointer+=count;
-    if (cd->backBufferPointer >= (80*2*25))
+    if (cd->backBufferPointer >= (w*2*h))
     {
-        scroll(buffer);
-        cd->backBufferPointer-=(80*2);
+        scroll(buffer,w,h);
+        cd->backBufferPointer-=(w*2);
     }
 }
-void enableCursor(bool enabled)
-{
-    char tmp;
-    OUTPORTB(0x0A,0x3D4);
-    INPORTB(tmp,0x3D5)
-    if (enabled)
-    {
-        tmp = (tmp & 0b11111); 
-    }
-    else
-    {
-        tmp = (tmp | 0b100000);
-    }
-    OUTPORTB(0x3D4, 0x0A);
-    OUTPORTB(tmp,0x3D5);
-}
-
-void updateTextCursor(struct ConsoleData *cd)
-{
-    enableCursor(cd->cursorOn);
-    if (cd->cursorOn)
-    {
-        uint16_t position = cd->backBufferPointer >> 1;
-        OUTPORTB(0x0F,0x3D4);
-        OUTPORTB((unsigned char)position, 0x3D5);
-        OUTPORTB(0x0E, 0x3D4);
-        OUTPORTB((unsigned char )(position>>8), 0x3D5);
-    }
-}
-
 
 /////////////////////////////////////////////////////////////////////
 // TODO: this could be written in ASM to increase performance
@@ -129,6 +99,8 @@ void updateTextCursor(struct ConsoleData *cd)
 void handleANSI(struct ConsoleData *cd, char* buffer, char c)
 {
     uint8_t i;
+    uint32_t w,h;
+    video_get_dimensions(cd->screen,&w,&h);
     cd->ansiData[cd->ansiIndex] = c;
     cd->ansiIndex++;
 
@@ -154,7 +126,7 @@ void handleANSI(struct ConsoleData *cd, char* buffer, char c)
                         *num += (c-48);
                     }
                 }
-                if (num1<25 && num2<80) cd->backBufferPointer = (num1*160)+(num2*2);
+                if (num1<h && num2<w) cd->backBufferPointer = (num1*w*2)+(num2*2);
             }
             else if (c=='A' || c=='B' || c=='C' || c=='D')
             {
@@ -171,23 +143,23 @@ void handleANSI(struct ConsoleData *cd, char* buffer, char c)
 
                 if (c=='A')
                 {
-                    cd->backBufferPointer -= (num*160);
-                    if (cd->backBufferPointer > (80*25*2)) cd->backBufferPointer=0;
+                    cd->backBufferPointer -= (num*w*2);
+                    if (cd->backBufferPointer > (w*h*2)) cd->backBufferPointer=0;
                 }
                 else if (c=='B')
                 {
-                    cd->backBufferPointer += (num*160);
-                    if (cd->backBufferPointer > (80*25*2)) cd->backBufferPointer=(80*25*2)-2;
+                    cd->backBufferPointer += (num*w*2);
+                    if (cd->backBufferPointer > (w*h*2)) cd->backBufferPointer=(w*h*2)-2;
                 }
                 else if (c=='C')
                 {
                     cd->backBufferPointer -= (num*2);
-                    if (cd->backBufferPointer > (80*25*2)) cd->backBufferPointer=0;
+                    if (cd->backBufferPointer > (w*h*2)) cd->backBufferPointer=0;
                 }
                 else if (c=='D')
                 {
                     cd->backBufferPointer += (num*2);
-                    if (cd->backBufferPointer > (80*25*2)) cd->backBufferPointer=(80*25*2)-2;
+                    if (cd->backBufferPointer > (w*h*2)) cd->backBufferPointer=(w*h*2)-2;
                 }
 
 
@@ -197,7 +169,7 @@ void handleANSI(struct ConsoleData *cd, char* buffer, char c)
                 if (*((uint32_t*)cd->ansiData) == 0x4A325B1B)
                 {
                     cd->backBufferPointer = 0;
-                    memclear64(buffer,80*25*2);
+                    memclear64(buffer,w*h*2);
                 }
             }
             else if (c=='s')
@@ -234,24 +206,13 @@ void flushTextVideo()
     unsigned int i;
     uint64_t currentThreadID;
     char c;    
-    char isFrontLine;
     char* outputBuffer;
+    uint32_t w,h;
+    
+    video_get_dimensions(cd->screen,&w,&h);
 
     rwlockReadLock(&frontLineSwitchLock);
-    outputBuffer = &cd->backBuffer;
-    isFrontLine = 0;
-    if (frontLineConsoleIndex != -1 && consoles[frontLineConsoleIndex] != 0)
-    {
-        uint64_t frontLineProcess = consoles[frontLineConsoleIndex]->owningProcess;
-        __asm("mov %%cr3,%0" : "=r"(currentThreadID));
-        currentThreadID &= 0x00FFFFFFFFFFF000LL;
-
-        if (currentThreadID == frontLineProcess)
-        {
-            outputBuffer = 0xB8000;
-            isFrontLine = 1;
-        }
-    }
+    outputBuffer = video_get_buffer(cd->screen); 
 
     for (i=0;i<cd->streamPointer;i++)
     {
@@ -260,17 +221,21 @@ void flushTextVideo()
         {
             handleANSI(cd, outputBuffer, c);
         }
+        else if (c==0x08)
+        {
+            cd->backBufferPointer -= 2; 
+        }
         else if (c=='\r')
         {
-            cd->backBufferPointer -= (cd->backBufferPointer % 160);
+            cd->backBufferPointer -= (cd->backBufferPointer % (w*2));
         }
         else if (c=='\n')
         {
-            increaseBufferPointer(cd,160,outputBuffer);
+            increaseBufferPointer(cd,(w*2),outputBuffer,w,h);
         }
         else if (c=='\t')
         {
-            increaseBufferPointer(cd,8,outputBuffer);
+            increaseBufferPointer(cd,8,outputBuffer,w,h);
         }
         else if (c=='\t')
         {
@@ -283,14 +248,11 @@ void flushTextVideo()
         else
         {
             outputBuffer[cd->backBufferPointer] = c;
-            increaseBufferPointer(cd,2, outputBuffer);
+            increaseBufferPointer(cd,2, outputBuffer,w,h);
         }
     }
     cd->streamPointer = 0;
-    if (isFrontLine)
-    {
-        updateTextCursor(cd);
-    }
+    video_update_cursor(cd->screen, cd->cursorOn, cd->backBufferPointer>>1);
     rwlockReadUnlock(&frontLineSwitchLock);
 }
 
@@ -305,7 +267,6 @@ void initConsoles()
     memoryPool = create_memory_pool(sizeof(struct ConsoleData));
 
     for (i=0;i<MAX_CONSOLES;i++) consoles[i] = 0;
-    enableCursor(false);
 }
 
 void storeCharacter(uint16_t c)
@@ -348,6 +309,12 @@ void destroy_text_console_handle(system_handle* handle)
     struct ConsoleData* h = (struct ConsoleData*)handle;
     restoreTextConsole(h->previousOwningProcess); 
     release_object(memoryPool,h);
+}
+
+Screen* getDirectVideo()
+{
+    struct ConsoleData* c = (struct ConsoleData*)CONSOLE_POINTER;
+    return c->screen;
 }
 
 struct ConsoleData* createTextConsoleForProcess()
@@ -425,7 +392,7 @@ void restoreTextConsole(struct ConsoleData* oldEntry)
             }
             else
             {
-                memcpy64(consoles[i]->backBuffer,oldEntry->backBuffer,(2*80*25));
+            //TODO: delete this    memcpy64(consoles[i]->backBuffer,oldEntry->backBuffer,(2*80*25));
                 oldEntry->backBufferPointer = consoles[i]->backBufferPointer;
                 consoles[i] = oldEntry;
             }
@@ -451,11 +418,11 @@ uint64_t stealTextConsole(uint64_t processID)
         {
             struct ConsoleData* oldEntry = consoles[i];
             consoles[i] = entry;
-            memcpy64(oldEntry->backBuffer,consoles[i]->backBuffer,(2*80*25));
+//TODO:            memcpy64(oldEntry->backBuffer,consoles[i]->backBuffer,(2*80*25));
+            consoles[i]->screen = oldEntry->screen;
             consoles[i]->backBufferPointer = oldEntry->backBufferPointer;
             consoles[i]->previousOwningProcess = oldEntry;
             mutexUnlock(&consoleListLock);
-pf("Console: %x\r\n",entry); //TODO: remove that. debug purposes only
             return (uint64_t)oldEntry;
         }
     }
@@ -468,6 +435,7 @@ void createTextConsole()
     uint64_t i;
 
     struct ConsoleData* entry = createTextConsoleForProcess();
+    entry->screen = video_create_screen();
     mutexLock(&consoleListLock);
     //TODO: must handle the case where no more consoles are available
     for (i=0;i<MAX_CONSOLES;i++)
@@ -485,6 +453,7 @@ void createTextConsole()
 void removeConsole()
 {
     uint64_t i;
+    //TODO: remove screen also
     struct ConsoleData* entry = *((struct ConsoleData**)CONSOLE_POINTER);
     for (i=0;i<MAX_CONSOLES;i++)
     {
@@ -507,18 +476,15 @@ void switchFrontLineProcessByIndex(uint64_t index)
     rwlockWriteLock(&frontLineSwitchLock);
     if (frontLineConsoleIndex != -1 && consoles[frontLineConsoleIndex]!=0)
     {
-        uint64_t oldIndex = frontLineConsoleIndex;
-        memcpy64((char*)0xB8000,consoles[frontLineConsoleIndex]->backBuffer,(2*80*25));
-        frontLineConsoleIndex = index;
-
+        video_change_active_screen(consoles[frontLineConsoleIndex]->screen,consoles[index]->screen);
     }
     else
     {
-        frontLineConsoleIndex = index;
+        video_change_active_screen(0,consoles[index]->screen);
     }
+    video_update_cursor(consoles[index]->screen,consoles[index]->cursorOn,consoles[index]->backBufferPointer>>1);
+    frontLineConsoleIndex = index;
 
-    memcpy64(consoles[frontLineConsoleIndex]->backBuffer,(char*)0xB8000,(2*80*25));
-    updateTextCursor(consoles[frontLineConsoleIndex]);
     rwlockWriteUnlock(&frontLineSwitchLock);
 }
 

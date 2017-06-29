@@ -1,6 +1,6 @@
 #include "utils.h"
 #include "../memorymap.h"
-#include "display.h"
+#include "printf.h"
 
 // WARNING
 //  we only support 48bitLBA (but we dont check for it)

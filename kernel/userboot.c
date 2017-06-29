@@ -2,7 +2,7 @@
 #include "block_cache.h"
 #include "userprocess.h"
 #include "vfs.h"
-#include "display.h"
+#include "printf.h"
 #include "utils.h"
 
 // This MUST be a multiple of 4096

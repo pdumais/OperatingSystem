@@ -205,6 +205,7 @@ longmode:
     call    initHardware
     call    init_memory_pools
     call    init_vfs
+    call    video_init
     call    initConsoles
     call    startKernelThread
 

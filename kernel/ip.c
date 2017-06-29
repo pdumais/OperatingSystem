@@ -1,4 +1,4 @@
-#include "display.h"
+#include "printf.h"
 #include "utils.h"
 #include "netcard.h"
 #include "sockets.h"

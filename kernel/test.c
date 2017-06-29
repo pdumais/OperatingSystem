@@ -1,7 +1,7 @@
 #include "../memorymap.h"
 #include "includes/kernel/types.h"
 #include "config.h"
-#include "display.h"
+#include "printf.h"
 
 unsigned long mutex=0;
 uint64_t cpus[10];

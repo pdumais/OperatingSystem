@@ -1,6 +1,6 @@
 #include "flatfs.h"
 #include "block_cache.h"
-#include "display.h"
+#include "printf.h"
 #include "utils.h"
 
 /*
