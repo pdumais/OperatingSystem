@@ -271,12 +271,18 @@ create_vcpus:
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 new_vcpu_thread:
-   /* push    %rdx
+    // test and set the bit to indicate the console was created
+    lock bts    $1,VMINFO_FLAGS(%rdx)
+    jc          no_need_for_new_console
+
+    push    %rdx
     call    createTextConsole
+    pop     %rdi
+    push    %rdi
+    call    ept_map_video_buffer
     pop     %rdx
 
-mov $0xB8000,%rdi
-movb $'A',(%rdi)*/
+no_need_for_new_console:
 
     // rdx is the metadata that is passed in the new thread. it can
     // be used for anything.

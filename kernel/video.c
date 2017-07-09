@@ -3,7 +3,7 @@
 #include "../memorymap.h"
 #include "utils.h"
 
-extern void* userAllocPages(uint64_t pageCount);
+extern char* kernelAllocPages(uint64_t pageCount);
 extern void memcpy64(char* source, char* dest, uint64_t size);
 extern void memclear64(char* dest, uint64_t size);
 extern void mutexLock(uint64_t*);
@@ -16,7 +16,9 @@ extern void mapPhysOnVirtualAddressSpace(uint64_t pageTableBase, uint64_t virtua
 
 #define MAX_SCREEN_COUNT 128
 
+volatile char* current_video_back_buffer;
 static uint64_t memorypool;
+
 
 void enable_cursor(bool enabled)
 {
@@ -66,34 +68,26 @@ Screen* video_create_screen()
 {
     uint64_t i;
     Screen* screen = (Screen*)reserve_object(memorypool);
+    memclear64((void*)screen,sizeof(Screen));
+
+    screen->backBuffer = kernelAllocPages(1);
     screen->active = false;
 
-    memclear64((void*)screen,sizeof(Screen));
+    memclear64((void*)screen->backBuffer,4096);
     return screen;
 }
 
 char* video_get_buffer(Screen* scr)
 {
-    char* buffer = (char*)0xB8000;
-    if (!scr->active) buffer = &scr->backBuffer;
-    return buffer;
+    return scr->backBuffer;
 }
 
 void video_change_active_screen(Screen* oldscr, Screen* newscr)
 {
-
-/* TODO
-    Always return the backbuffer pointer. But change the mapping of that virtual address
-    to B8000 when becomming active
-
-    then we must invalidate tlb with invpcid(type=2) but I am not sure if EPT
-    mappings will be invalidated
-*/
     if (oldscr)
     {
         oldscr->active = false;
-        memcpy64((char*)0xB8000,&oldscr->backBuffer,(2*80*25));
     }
     newscr->active = true;
-    memcpy64(&newscr->backBuffer,(char*)0xB8000,(2*80*25));
+    current_video_back_buffer = newscr->backBuffer;
 }

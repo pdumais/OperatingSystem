@@ -4,7 +4,8 @@
 
 typedef struct
 {
-    char backBuffer[4096];
+//    char backBuffer[4096];
+    char* backBuffer;
     bool    active;
 } Screen;
 

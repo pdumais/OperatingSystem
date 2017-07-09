@@ -138,7 +138,7 @@ void* reserve_object(uint64_t pool)
 void release_object(uint64_t pool, void* obj)
 {
     uint64_t addr = ((uint64_t)obj)-sizeof(memory_pool_node);
-pf("mempool release %x %x\r\n",pool,addr);
+//pf("mempool release %x %x\r\n",pool,addr);
     memory_pool_node* node = (memory_pool_node*)addr;
     node->flags &= 0b11111110;
 }

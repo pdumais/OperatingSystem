@@ -3,4 +3,4 @@
 void printf(char* str,...);
 void sprintf(char* dst, unsigned int max, char* str,...);
 uint16_t poll_in();
-
+char* get_video_buffer();

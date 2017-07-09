@@ -26,14 +26,20 @@ getCurrentThreadID:
 // so yielding would have been done and we do it again
 yield:
     push    %rdi
+    pushf
+    pop     %rdi
+    bt      $9,%rdi
+    jnc     cant_yield
     mov     $TIME_SLICE_COUNT,%rdi    // This variable is mapped in thread space. So multi-thread safe
     movq    $1,(%rdi)                 // next time we get scheduled, count will decrease to 0 and a switch will occur
-1:  hlt
-    //cmpq    $1,(%rdi)  if another int triggered, hlt will return. Avoid that
-    //je      1b
+1:  hlt                                 // if we do that while interrupts are cleared, we will never wake up
+//    cmpq    $1,(%rdi)  //if another int triggered, hlt will return. Avoid that
+//    je      1b we can only do this if interrupts in enabled
     pop     %rdi
     ret
-
+cant_yield:
+    // Interrupts are cleared!!!
+    int     $3
 
 /*
     returns address of page directory entry associated with virtual address passed in %rdi

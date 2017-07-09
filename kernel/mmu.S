@@ -18,6 +18,7 @@
 .global virt2phys
 .global releasePhysicalPage
 .global emulate_invpcid
+.global isMirrorPageDirty
 .global release_pages
 
 /*
@@ -666,30 +667,6 @@ setupProcessPageStructure:
  
     mov     $(MAX_RAM/(1024*1024*1024)),%rcx
     rep movsq
-/*
-5:
-    mov     $(MAX_RAM/(1024*1024*1024)),%rdi                                          
-    mov     $0b011000000000,%rsi                                                      
-    call    allocatePhysicalPages                                                     
-    // At this point, rax contains the physical address of the 1st PD table           
-    mov     %rax,%rbx                                                                 
-    mov     %r11,%rdi                                                                 
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping           
-    add     $(256*8),%rdi           // write entries above the 256th gigs             
-    or      $0b000000000111,%rax    // present, r/w, user/supervisor access, no pwt nor pcd
-    mov     $(MAX_RAM/(1024*1024*1024)),%rcx                                          
-1:  stosq                                                                             
-    add     $0x1000,%rax         // next PD table is 4k further                       
-    loop    1b                                                                        
-                                                                                      
-    mov     %rbx,%rdi                                                                 
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping           
-    mov     $0b0010010000111,%rax           // Start at address 0. present, rw, US, in use by kernel
-    mov     $(MAX_RAM/(2*1024*1024)),%rcx   // 128meg /  2mb  = 64 entries            
-1:  stosq                                                                             
-    add     $0x200000,%rax                  // next page start 2mb further            
-    loop    1b                                                                      
-*/
 
     pop     %r11
     pop     %r10
@@ -861,6 +838,32 @@ calculateMemoryUsage:
     ret
 
 
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+// Function: isMirrorPageDirty(rdi=virtual_address) 
+// This will lookup an PTE in the mirror page tables. Those page tables
+// are common to all processes. This will return the dirty bit of the PTE
+// This will reset the dirty flag
+// Return: dirty bit is stored in carry flag
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+isMirrorPageDirty:
+    push    %rdi
+
+    btr     $38,%rdi
+
+    // the page tables start at 128mb, because before that, 
+    // the mapping is in the the PDE. The PDP is shared for all 
+    // processes, so we access the same place.
+
+    // get page entry in table: addr/4096 * 8
+    shr         $9,%rdi   
+
+    // now add PATABLES - (128meg/4096)*8
+    btr         $6,(PAGETABLES-0x40000)(%rdi)
+    mov (PAGETABLES-0x40000)(%rdi),%rax
+    pop         %rdi
+    ret
 
 
 

@@ -229,7 +229,7 @@ initSMPForBST:
 
     //setup timer interrupt for APIC
     mov     $APIC_TIMER_VECTOR,%rax
-    mov     $schedulerHandler,%rbx
+    mov     $apic_timer_handler,%rbx
     call    registerInterruptGate
 
     GET_APIC_ID(%eax)

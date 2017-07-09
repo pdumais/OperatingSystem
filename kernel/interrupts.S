@@ -6,6 +6,7 @@
 .global loadIDT
 .global registerInterruptGate
 .global registerTrapGate
+.global divideByZeroHandler
 
 .extern debug_writenumber_dangerous
 .extern ackAPIC
@@ -121,7 +122,7 @@ IDTRegister:
 ////////////////////////////////////////////////////////////////////////////////////
 .align 4
 InterruptHandlers:
-    .quad defaultHandler
+    .quad divideByZeroHandler
     .quad defaultHandler
     .quad defaultHandler
     .quad int3Handler
@@ -154,6 +155,17 @@ InterruptHandlers:
     .quad defaultHandlerWithError
     .quad defaultHandler
 
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+// Divide by zero 
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+.align 16
+divideByZeroHandler:
+    mov     $0,%rax
+    mov     $0,%rbx
+    div     %rbx        // this is a hack to tripple fault
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
@@ -382,6 +394,11 @@ crashDump:
     push    %rdi
     push    %rsi
     push    %rcx
+
+    //Note that if another CPU has already started to redraw the screen
+    // then the following might not work
+    movq    $0,video_refresh_enable
+
     mov     $0xB8000,%rdi
     mov     $crashDumpString,%rsi
     mov     $crashDumpString_end-crashDumpString,%rcx

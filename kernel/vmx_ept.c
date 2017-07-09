@@ -2,12 +2,13 @@
 #include "vmx.h"
 #include "macros.h"
 #include "../memorymap.h"
-
+#include "console.h"
 
 extern uint64_t* kernelAllocPages(unsigned int pageCount);
 extern void spinLock(uint64_t*);
 extern void spinUnlock(uint64_t*);
 extern uint64_t get_apic_address();
+extern Screen* getDirectVideo();
 
 //TODO: when deleting a VM, we should free all those pages.
 
@@ -95,10 +96,17 @@ void ept_map_pages(uint64_t vm_start_address, uint64_t map_address, uint64_t pag
     spinUnlock(vm->memory_lock);
 }
 
+void ept_map_video_buffer(vminfo* vm)
+{
+    Screen* s = getDirectVideo();
+//__asm__("int $3": : "a"(s->backBuffer));
+    
+    ept_map_pages(0xB8000, UNMIRROR(s->backBuffer), 1, vm);
+}
+
 void ept_init_static_pages(vminfo* vm)
 {
-    //TODO: this is just for debugging, remove that.
-    ept_map_pages(0xB8000, 0xB8000, 1, vm);
+    
 //    uint64_t apic_base = get_apic_address();
 //    ept_map_pages(VAPIC_GUEST_ADDRESS,apic_base, 1, vm);
 }

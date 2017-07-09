@@ -140,3 +140,10 @@ uint16_t poll_in()
     __asm("int $0xA0" : "=a"(ret) : "a"(INTA0_POLL_IN));
     return ret;
 }
+
+char* get_video_buffer()
+{
+    char* ret;
+    __asm("int $0xA0" : "=a"(ret) : "a"(INTA0_GETDIRECTBUFFER));
+    return ret;
+}

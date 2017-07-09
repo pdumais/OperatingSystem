@@ -1,5 +1,4 @@
 #define MAX_RAM (4*1024*1024*1024)
-//Stupid C compiler... must find a better way
 #define MAX_RAM_CONSTANT_FOR_C ((4LL)*(1024LL)*(1024LL)*(1024LL))
 
 #define TSS             0x00000500
@@ -20,7 +19,7 @@
 #define RESERVED1       0x00007000
 #define RESERVED1END    0x00007FFF
 #define PML4TABLE       0x00008000      // needs to be 4k aligned. we only use 1 entry
-#define PDPTTABLE       0x00009000      // needs to be 4k aligned. we only use 4 entries (so 16bytes)
+#define PDPTTABLE       0x00009000      // needs to be 4k aligned. we only use 4 entries (so 16bytes). 1 PDPT covers 512gig, so only 2 tables is needed
 #define PDTABLE         0x0000A000      // need to be 4k aligned. enough space for 4 page directories (4gig total)
 #define PDTABLEIDENTITY 0x0000E000      // need to be 4k aligned. enough space for 4 page directories (4gig total)
 #define RESERVED5       0x00012000
@@ -89,4 +88,5 @@
 // Scheduler
 #define TASK_TIME_MS  40                   // a task will 40 ms
 #define TASK_QUANTUM_COUNTER (TASK_TIME_MS/(DESIRED_APIC_PERIOD_NS/1000000))
-
+#define SCREEN_REFRESH_RATE 30
+#define SCREEN_REFRESH_RATE_COUNTER ((1000000000/SCREEN_REFRESH_RATE)/DESIRED_APIC_PERIOD_NS)

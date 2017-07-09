@@ -168,6 +168,7 @@ void loadUserApplications(uint64_t device)
     int fsize = fread(f,512,bootscript);
     fclose(f);
 
+
     n = 0;
     for (i = 0; i< fsize; i++)
     {

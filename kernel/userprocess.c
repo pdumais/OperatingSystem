@@ -192,10 +192,10 @@ void manageDeadProcesses()
         // race condition, it is perfectly safe to destroy all the memory 
         // associated to that process
         memdiff = calculateMemoryUsage();               // Terribly bad for performance, for debug only
-        pf("Reaping dead task [%x] ...",pml4);
+//        pf("Reaping dead task [%x] ...",pml4);
         destroyProcessMemory(pml4);
         memdiff -= calculateMemoryUsage();  
-        pf(" %x pages freed\r\n",memdiff);
+//        pf(" %x pages freed\r\n",memdiff);
     }
 }
 

@@ -102,7 +102,6 @@ uint64_t flatfs_fread(system_handle* h, uint64_t count, char* destination)
 {
     char buf[512];
     file_handle* f = (file_handle*)h;
-
     if ((f->position + count) > f->size) count = (f->size-f->position); 
 
     uint64_t first_sector = f->start + (f->position>>9);

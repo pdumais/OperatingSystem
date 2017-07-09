@@ -313,7 +313,8 @@ void destroy_text_console_handle(system_handle* handle)
 
 Screen* getDirectVideo()
 {
-    struct ConsoleData* c = (struct ConsoleData*)CONSOLE_POINTER;
+    struct ConsoleData* c = *((struct ConsoleData**)CONSOLE_POINTER);
+//__asm__("int $3": : "a"(c->screen));
     return c->screen;
 }
 

@@ -35,7 +35,7 @@ mutexUnlock:       // rdi = mutext address
     ret
 
 
-// spinlock with ticketing system.
+// spinlock with ticketing systemnfo .
 // rdi= address to mutex
 // spinlock is a 64bit value representing:
 // 63:32: next ticket
@@ -44,6 +44,8 @@ spinLock:
     push        %rax
     mov         $1,%rax
     lock xadd   %eax,(%rdi)
+    // eax has been loaded with the value that was in (%rdi), now wait until
+    // the second part becomes equal to that
 1:  cmp         %eax,4(%rdi)
     jne         1b
     pop         %rax

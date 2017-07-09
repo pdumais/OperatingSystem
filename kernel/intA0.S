@@ -88,6 +88,8 @@ intA0:
     je          intA0_listen
     cmp         $INTA0_ACCEPT,%rax
     je          intA0_accept
+    cmp         $INTA0_GETDIRECTBUFFER,%rax
+    je          intA0_get_direct_buffer
     jmp         intA0_exit
 
 intA0_get_apic_id:
@@ -101,6 +103,11 @@ intA0_kill_current_task:
     call        destroyFileHandles
     call        removeConsole
     call        killCurrentTask
+    jmp         intA0_exit
+
+intA0_get_direct_buffer:
+    call        getDirectVideo
+    mov         (%rax),%rax     // backbuffer 
     jmp         intA0_exit
 
 intA0_printf:

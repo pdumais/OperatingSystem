@@ -19,6 +19,11 @@ getDateTime:
     push        %rax
     push        %rdi
 
+    push        %rdi
+    mov         $cmoslock,%rdi
+    call        spinLock
+    pop         %rdi
+
     // TODO: should adjust for time zone
 
     //TODO: should be carefull about CMOS updates
@@ -58,6 +63,11 @@ getDateTime:
 
     movb        $0,(%rdi)
 
+    mov         $cmoslock,%rdi
+    call        spinUnlock
+
     pop         %rdi
     pop         %rax
     ret
+
+cmoslock: .quad 0

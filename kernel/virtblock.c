@@ -87,6 +87,7 @@ static void process_block_device_interrupt(virtio_block_device* dev, u32 dev_ind
 
 static void handler()
 {
+
     u8 deviceIndex;
     u8 v;
     // for each device that has data ready, ack the ISR
