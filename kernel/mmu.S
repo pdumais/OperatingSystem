@@ -118,6 +118,7 @@ emulate_invpcid:
     popfq
     pop         %rax
     ret
+
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 // kernelReleasePages(rdi=phy_address, rsi=count)
@@ -127,7 +128,7 @@ kernelReleasePages:
     push        %rcx
     push        %rdi
     
-    btrq        $38,%rdi
+    btrq        $MIRROR_BIT,%rdi
     mov         %rsi,%rcx
 1:  call        releasePhysicalPage
     add         $0x1000,%rdi
@@ -177,7 +178,7 @@ releaseError:
 // rdi = number of pages
 kernelAllocPages:
     call    allocateHeapPage
-    btsq    $38,%rax            // set address in mirror space
+    btsq    $MIRROR_BIT,%rax            // set address in mirror space
     ret
 
 // %rdx = PDTABLE entry to start from
@@ -307,8 +308,6 @@ reservePhysicalMemoryForVirtualRange:
     and         $0xFFF,%rdi
     or          %rbx,%rdi
     mov         %rdi,(%rax)
-//cli
-//STALL()
     add         $0x1000,%rdx
     loop        1b  
 
@@ -346,7 +345,7 @@ currentProcessVirt2phys:
     jnc         pageDoesNotExist
     shr         $12,%rax
     shl         $12,%rax
-    btsq        $38,%rax
+    btsq        $MIRROR_BIT,%rax
     btrq        $63,%rax        // remove the NX bit
     add         %rcx,%rax
     pop         %rcx
@@ -372,7 +371,7 @@ virt2phys:
 
     mov         %rsi,%rax
     CLEANCR3ADDRESS(%rax)
-    btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
+    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
     //rax=PML4 address
 
     // get PML4 offset from virtual address
@@ -385,7 +384,7 @@ virt2phys:
     jnc         pageDoesNotExist2
     shr         $12,%rax
     shl         $12,%rax
-    btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
+    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
     // rax = PDP table address
 
     // get PDP offset from virtual address
@@ -398,7 +397,7 @@ virt2phys:
     jnc         pageDoesNotExist2
     shr         $12,%rax
     shl         $12,%rax
-    btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
+    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
     // rax = PD table address
 
     // get PD offset from virtual address
@@ -411,7 +410,7 @@ virt2phys:
     jnc         pageDoesNotExist2
     shr         $12,%rax
     shl         $12,%rax
-    btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
+    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
     // rax = PT table address
 
     // get PT offset from virtual address
@@ -450,7 +449,7 @@ getPTEntry:
 
     mov         %cr3,%rax
     CLEANCR3ADDRESS(%rax)
-    btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
+    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
     //rax=PML4 address
 
     // get PML4 offset from virtual address
@@ -461,7 +460,7 @@ getPTEntry:
     mov         (%rax),%rax
     shr         $12,%rax
     shl         $12,%rax
-    btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
+    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
     // rax = PDP table address
 
     // get PDP offset from virtual address
@@ -472,7 +471,7 @@ getPTEntry:
     mov         (%rax),%rax
     shr         $12,%rax
     shl         $12,%rax
-    btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
+    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
     // rax = PD table address
 
     // get PD offset from virtual address
@@ -483,7 +482,7 @@ getPTEntry:
     mov         (%rax),%rax
     shr         $12,%rax
     shl         $12,%rax
-    btsq        $38,%rax        // set bit38 to add 256gig for identity mapping
+    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
     // rax = PT table address
     
     // get PT offset from virtual address
@@ -547,7 +546,7 @@ setupProcessPageStructure:
     
     // clear the table first
     mov     %rax,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
     mov     $512,%rcx               
     xor     %rax,%rax
     rep     stosq
@@ -562,12 +561,15 @@ setupProcessPageStructure:
     // physical address
     or      $0b000000000111,%rax    // present, r/w, user/supervisor access, no pwt nor pcd
     mov     %r8,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        
     mov     %rax,(%rdi)              // 1st entry in PLM4
+    mov     $PDPTTABLE,%rax
+    or      $0b111,%rax
+    mov     %rax,(8*128)(%rdi)       // 128th entry for mirror
 
     // clear the PDPT table
     mov     %rbx,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        
     mov     $512,%rcx          
     xor     %rax,%rax
     rep     stosq
@@ -582,7 +584,7 @@ setupProcessPageStructure:
 
     // Create the PDPT entries from the PD address.
     mov     %rbx,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
     mov     %rbx,%r11       // we will use PDPT address to create identiry mapping later
     mov     %rax,%rbx
     or      $0b000000000111,%rax    // present, r/w, user/supervisor access, no pwt nor pcd
@@ -593,7 +595,7 @@ setupProcessPageStructure:
 
     // clear the PD tables
     mov     %rbx,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
     mov     $(512*(MAX_RAM/(1024*1024*1024))),%rcx      
     xor     %rax,%rax
     rep     stosq
@@ -602,7 +604,7 @@ setupProcessPageStructure:
     // The first 128meg is addressible as 2meg pages. so the first 64 entries
     // will be created as 2meg pages. The rest as 4k pages
     mov     %rbx,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
     mov     $0b0010010000111,%rax           // Start at address 0. present, rw, US, in use by kernel 
     mov     $(KERNEL_RESERVED_END/(2*1024*1024)),%rcx   // 128meg /  2mb  = 64 entries
 1:  stosq
@@ -623,7 +625,7 @@ setupProcessPageStructure:
     // Each Page tables addresses 2 megs so we need 
     // (MAX_RAM-KERNEL_RESERVED_END)/(2*1024*1024) entries
     mov     %r10,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
     or      $0b111,%rax
     mov     $((MAX_RAM-KERNEL_RESERVED_END)/(2*1024*1024)),%rcx
 1:  stosq                       
@@ -635,7 +637,7 @@ setupProcessPageStructure:
     // only do this up to stack top since mmio will follow
     // Each pages are 4k, so we need ((stacktop-KERNEL_RESERVED_END)/4096) descriptors
     mov     %r9,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
     xor     %rax,%rax
     //mov     $(KERNEL_RESERVED_END|0b111),%rax 
     mov     $((STACK0TOP_VIRTUAL_ADDRESS-KERNEL_RESERVED_END)/4096),%rcx  // Each of those 4k pages will be unused for now
@@ -650,6 +652,9 @@ setupProcessPageStructure:
     add     $0x1000,%rax
     loop    1b
 
+
+
+
     // create the PDPT entries for identity mapping after 256th gig
     // Within the first 512gig of addressing space, the last 256 will be
     // identity mapped to the bottom 256gig.
@@ -657,16 +662,16 @@ setupProcessPageStructure:
     // its page directories that points to the identity tables
 
 
-    // rdi=PDPE for the the 256th gig
+    /* // rdi=PDPE for the the 256th gig
     mov     %r11,%rdi
-    btsq    $38,%rdi        
+    btsq    $MIRROR_BIT,%rdi        
     add     $(256*8),%rdi  
     // rsi=PDPE of kernel pages
     mov     $PDPTTABLE,%rsi
     add     $(256*8),%rsi
  
     mov     $(MAX_RAM/(1024*1024*1024)),%rcx
-    rep movsq
+    rep movsq*/
 
     pop     %r11
     pop     %r10
@@ -729,7 +734,7 @@ destroyTable:
     push        %rbx
     mov         $~0x8000000000000FFF,%rbx  
     mov         $512,%rcx               // there are 512 entries for a table
-    btsq        $38,%rdi                // need to access this using the mirror area
+    btsq        $MIRROR_BIT,%rdi                // need to access this using the mirror area
 1:  mov         (%rdi),%rax
     xchg        %rdi,%rax               // temp save
 
@@ -824,7 +829,7 @@ calculateMemoryUsage:
     
     xor         %rax,%rax
     mov         $PAGETABLES,%rdi
-    btsq        $38,%rdi
+    btsq        $MIRROR_BIT,%rdi
     
     mov         $((PAGETABLES_END-PAGETABLES)/8),%rcx
 1:  testq       $0b111000000000,(%rdi)
@@ -850,7 +855,7 @@ calculateMemoryUsage:
 isMirrorPageDirty:
     push    %rdi
 
-    btr     $38,%rdi
+    btr     $MIRROR_BIT,%rdi
 
     // the page tables start at 128mb, because before that, 
     // the mapping is in the the PDE. The PDP is shared for all 
@@ -905,6 +910,7 @@ setupPageStructure:
     xor     %ebx,%ebx       /* upper 32bit of PML4 entry. address=0 because below 4G. NX=0*/
     mov     %eax,(%edi)
     mov     %ebx,4(%edi)
+    mov     %eax,(8*128)(%edi)   // same entry for #256 for mirror
 
     // Create the PDPT with 4 entries. Each entry describres 1 gig
     mov     $PDPTTABLE,%edi

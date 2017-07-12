@@ -1,3 +1,5 @@
+//#define MIRROR_BIT 38
+#define MIRROR_BIT 46
 #define GET_APIC_ID(reg) mov (APIC_BASE+0x20),reg; shr $24,reg
 #define STACK_ADDRESS_PAGE_TABLE_OFFSET (((((STACK0TOP_VIRTUAL_ADDRESS-1-KERNEL_RESERVED_END))>>12)<<3))
 #define STACK3_ADDRESS_PAGE_TABLE_OFFSET (((((STACK3TOP_VIRTUAL_ADDRESS-1-KERNEL_RESERVED_END))>>12)<<3))
@@ -8,8 +10,8 @@
 
 // Addresses starting at 0x4000000000 mirrors physical memory. So these addresses
 // are usefull when wanting to bypass physical mapping
-#define MIRROR(x) (((uint64_t)x)|0x4000000000)
-#define UNMIRROR(x) (((uint64_t)x)&~0x4000000000)
+#define MIRROR(x) (((uint64_t)x)|(1LL<<MIRROR_BIT))
+#define UNMIRROR(x) (((uint64_t)x)&~(1LL<<MIRROR_BIT))
 
 #define PUSHAEXCEPTRAX  push    %rdi; \
     push    %rbx; \

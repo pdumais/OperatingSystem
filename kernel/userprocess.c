@@ -2,9 +2,10 @@
 #include "printf.h"
 #include "../memorymap.h"
 #include "userprocess.h"
+#include "macros.h"
 
-#define MIRRORAREA(x) (((uint64_t)x)|0x4000000000)
-#define ISMIRROR_ADDRESS(x) (x>=0x4000000000LL)
+#define MIRRORAREA(x) (((uint64_t)x)|(1LL<<MIRROR_BIT))
+#define ISMIRROR_ADDRESS(x) (x>=(1LL<<MIRROR_BIT))
 
 
 extern void* virt2phys(void* address, uint64_t pml4);

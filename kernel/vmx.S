@@ -37,7 +37,7 @@ add_vmcs_to_vminfo:
     push        %rcx
 
     mov         $(VMINFO_VMCS_COUNT+1),%rcx
-    btr         $38,%rsi                // to physical address
+    btr         $MIRROR_BIT,%rsi                // to physical address
 
     add         $VMINFO_VMCS,%rdi
 1:  mov         (%rdi),%rax
@@ -185,7 +185,7 @@ vmx_enabled_in_msr:
     movl        %eax,(%rdi)
 
     // Enter VMX root-operations
-    btrq        $38,%rdi            // to phys address
+    btrq        $MIRROR_BIT,%rdi            // to phys address
     push        %rdi
     vmxon       (%rsp)
     pop         %rdi
@@ -254,7 +254,7 @@ create_vcpus:
 
     // At this point, we know all vCPUs are created
     mov         (%rdx),%rdx
-    bts         $38,%rdx
+    bts         $MIRROR_BIT,%rdx
     movl        $0,4(%rdx)
 
     pop         %rbx
@@ -340,7 +340,7 @@ create_vcpu:
     // Get revision ID and set it in the VMCS
     call        get_revision_id
     movl        %eax,(%rdi)
-    btrq        $38,%rdi            // to phys address
+    btrq        $MIRROR_BIT,%rdi            // to phys address
     mov         $PROCESS_VMCS,%rax
     mov         %rdi,(%rax)   // save the VMCS
     vmclear     (%rax)
@@ -350,7 +350,7 @@ create_vcpu:
 
 
     mov         VMINFO_PML4(%r14),%rdi
-    btrq        $38,%rdi            // to phys address
+    btrq        $MIRROR_BIT,%rdi            // to phys address
     call        init_vm_vmcs
 
     pop         %rdi                    //metadata to be handed to VM
@@ -368,9 +368,9 @@ create_vcpu:
     // add VMCS in vmcs list of vminfo
     push        %rdi
     mov         (%rax),%rsi         // VMCS
-    bts         $38,%rsi
+    bts         $MIRROR_BIT,%rsi
     movl        $0xDEADBEEF,4(%rsi) // set as pending-start
-    btr         $38,%rsi
+    btr         $MIRROR_BIT,%rsi
     mov         %r14,%rdi           //vminfo
     call        add_vmcs_to_vminfo
     pop         %rdi
@@ -383,7 +383,7 @@ create_vcpu:
 check_vm_state:
     mov         $PROCESS_VMCS,%rax
     mov         (%rax),%rbx
-    bts         $38,%rbx
+    bts         $MIRROR_BIT,%rbx
     cmpl        $0,4(%rbx)
     je          launchvm
     call        yield
@@ -549,7 +549,7 @@ init_vm_vmcs:
     call        get_apic_address
     VMWRITE($VMCS_APIC_ACCESS_ADDR,%rax)
     mov         %rsi,%rax
-    btr         $38,%rax
+    btr         $MIRROR_BIT,%rax
     VMWRITE($VMCS_VIRTUAL_APIC_PAGE_ADDR,%rax)
 
     // r15 contains the 4k-aligned base address of the guest'PML4
@@ -673,7 +673,7 @@ handle_vmcall_sipi:
 1:  mov         (%rbp),%rcx   //VMCS
     cmp         $0,%rcx       // is it a null entry?
     je          2f            //  if yes then we reached end of list
-    bts         $38,%rcx
+    bts         $MIRROR_BIT,%rcx
     cmpl        $0xDEADBEEF,4(%rcx)    // waiting for startup?
     jne         3f          // if not then no processing is needed
 
@@ -701,7 +701,7 @@ handle_vmcall_sipi_error:
 handle_apic_access:
     VMREAD($VMCS_VIRTUAL_APIC_PAGE_ADDR)
     mov         %rax,%rbp
-    bts         $38,%rbp 
+    bts         $MIRROR_BIT,%rbp 
     VMREAD($VMCS_EXIT_QUALIFICATION)
     int         $3
 

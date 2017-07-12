@@ -215,7 +215,7 @@ createKernelThread:
 
     mov     %rax,%rsi
     mov     %r9,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
     add     $STACK_ADDRESS_PAGE_TABLE_OFFSET-(3*8),%rdi
     mov     $4,%rcx
     call    mapMemory
@@ -223,7 +223,7 @@ createKernelThread:
     mov     %rax,%rsi
     add     $0x4000,%rsi
     mov     %r9,%rdi
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
     add     $META_ADDRESS_PAGE_TABLE_OFFSET,%rdi
     mov     $1,%rcx
     call    mapMemory
@@ -237,12 +237,12 @@ createKernelThread:
     push    %rax
     mov     %rax,%rsi
     mov     %r9,%rdi
-    btsq    $38,%rdi
+    btsq    $MIRROR_BIT,%rdi
     add     $0,%rdi    // Useless but shows that the heap starts at 0x08000000 since 
     mov     $1,%rcx   // kernel threads are not relocated.
     call    mapMemory
     pop     %rdi
-    btsq    $38,%rdi
+    btsq    $MIRROR_BIT,%rdi
     call    init_heap
     pop     %rsi
     pop     %rdi
@@ -252,7 +252,7 @@ createKernelThread:
     // This is the stack data for the IRETQ that will occur after the timer iterrupt
     // when the task will be scheduled
     // rdi = end of stack (and begining of meta) that we calculated earlier
-    btsq    $38,%rdi        // set bit38 to add 256gig for identity mapping
+    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
     movq    $0,-8(%rdi) /* ss */
     movq    $(STACK0TOP_VIRTUAL_ADDRESS),%rax
     movq    %rax,-16(%rdi)   /* rsp */
