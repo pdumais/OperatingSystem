@@ -90,6 +90,7 @@ static void handler()
 
     u8 deviceIndex;
     u8 v;
+
     // for each device that has data ready, ack the ISR
     for (deviceIndex = 0; deviceIndex < 32; deviceIndex++)
     {

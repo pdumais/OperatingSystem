@@ -190,17 +190,16 @@ longmodeAP:
 
 .align 16
 longmode:
+    mov     $RAM_COUNT_GIG,%rdi
+    call    setup_kernel_page_structure
+    //TODO: should clear TLB
+
 
     call    prepareGDTAndTSS
     call    setupIDT
     call    loadIDT
     call    enableAVX
     call    initScheduler
-
-/*mov $(128*1024*1024),%rdi
-bts $46,%rdi
-mov (%rdi),%rax
-STALL()*/
 
     call    initSMPForBST
     call    initAPICTimer

@@ -80,7 +80,7 @@ void ept_map_pages(uint64_t vm_start_address, uint64_t map_address, uint64_t pag
 {
     uint64_t i;
 
-    spinLock(vm->memory_lock);
+    spinLock(&(vm->memory_lock));
 
     //TODO: should check it not already mapped
     for (i=0;i<page_count;i++)
@@ -93,7 +93,7 @@ void ept_map_pages(uint64_t vm_start_address, uint64_t map_address, uint64_t pag
         map_address += 4096;
     }
 
-    spinUnlock(vm->memory_lock);
+    spinUnlock(&(vm->memory_lock));
 }
 
 void ept_map_video_buffer(vminfo* vm)

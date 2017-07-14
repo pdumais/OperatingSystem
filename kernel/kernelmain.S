@@ -49,7 +49,6 @@ startKernelThread:
 // this thread serves no purpose, it's just to test if
 // I can launch a thread from another thread
 mainkernelthread:
-
     call    createTextConsole
 
     call    initTestIPI
@@ -84,30 +83,12 @@ mainkernelthread:
     call    net_setDefaultGateway
 
 
-/*mov $100,%rcx
-1:
-push %rcx
-mov %rcx,%rdi
-mov $4,%rsi
-mov $blockbuffer,%rdx
-mov $1,%rcx
-call block_cache_read
-pop %rcx
-loop 1b
-
-int $3*/
-
     mov     $4,%rdi             //4= virtio drive
     call    loadUserApplications
-
 
     mov     $0xA60,%rsi
     mov     $6,%rdi
     call    create_vm
-//    mov     $0xB00,%rsi
-//    mov     $6,%rdi
-//    call    create_vm
-
     mov     $shellname,%rdi
     mov     $0,%rsi
     mov     $INTA0_LOADPROCESS,%rax

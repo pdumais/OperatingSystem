@@ -1,4 +1,7 @@
-//#define MIRROR_BIT 38
+
+// the reason for not using bit 47 for mirror mapping is because of cannonical adrreses
+// that requires that bit 64-48 be set to match bit 47. Using bit 46 will impose a limit
+// of 65536 gig of ram to the OS
 #define MIRROR_BIT 46
 #define GET_APIC_ID(reg) mov (APIC_BASE+0x20),reg; shr $24,reg
 #define STACK_ADDRESS_PAGE_TABLE_OFFSET (((((STACK0TOP_VIRTUAL_ADDRESS-1-KERNEL_RESERVED_END))>>12)<<3))

@@ -232,7 +232,6 @@ create_vm:
     call        create_ept
     pop         %rdx          //rdx=param for thread in launchKernelThread
                               // in this case, we pass in the vminfo
-
     mov         $new_vcpu_thread,%rdi
     mov         $(new_vcpu_thread_end-new_vcpu_thread),%rsi
     push        %rcx

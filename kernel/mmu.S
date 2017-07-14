@@ -21,6 +21,7 @@
 .global isMirrorPageDirty
 .global release_pages
 
+
 /*
     The first 128mb in ram are reserved for kernel use. They are mapped as 2mb pages.
     That area contains the kernel code and the kernel's page tables.
@@ -498,6 +499,7 @@ getPTEntry:
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 setupProcessPageStructureForUserProcess:
+    push        %rdx
     push        %rdi
     push        %r8
     push        %r9
@@ -509,6 +511,7 @@ setupProcessPageStructureForUserProcess:
     pop         %r9
     pop         %r8
     pop         %rdi
+    pop         %rdx
     ret
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -516,11 +519,6 @@ setupProcessPageStructureForUserProcess:
 // Function: setupProcessPageStructure()
 // This will create a page structure somewhere in RAM and return the 
 // base physical address of the PLM4 table
-//
-// TODO: When filling the tables, we are assuming that
-// they are all contiguous in memory. allocatePhysicalPages
-// will guarantee that, but it should not be the case because
-// this is a severe constraint
 //
 // returns:
 //      r8 = pml4 offset
@@ -530,153 +528,19 @@ setupProcessPageStructure:
     push    %rax
     push    %rdi
     push    %rsi
-    push    %rbx
-    push    %rcx
-    push    %r10
-    push    %r11
-    
-    //---- PLM4 TABLE
-    // Reserve 1 4k page in physical memory to hold a PLM4 table
-    // this will return the physical address of the page in rax
-    mov     $1,%rdi
-    mov     $0b011000000000,%rsi    // AVL bits to be set
-    call    allocatePhysicalPages
-    mov     %rax,%r8                // this is the PML4 table
+    push    %rdx 
 
-    
-    // clear the table first
-    mov     %rax,%rdi
-    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
-    mov     $512,%rcx               
-    xor     %rax,%rax
-    rep     stosq
-    // Then reserve another 4k page in physical memory to hold a PDPT table
-    // this will return the physical address of the page in rax
-    mov     $1,%rdi
-    mov     $0b011000000000,%rsi    // AVL bits to be set
-    call    allocatePhysicalPages       
-    mov     %rax,%rbx
+    mov     $RAM_COUNT_GIG,%rdi
+    sub     $8,%rsp
+    mov     %rsp,%rsi
+    sub     $8,%rsp
+    mov     %rsp,%rdx
+    call    setup_process_page_structure
+    mov     8(%rsp),%r8
+    mov     (%rsp),%r9
+    add     $16,%rsp
 
-    // Create the PLM4 entry (only 1 for 512gig) from the PDPT
-    // physical address
-    or      $0b000000000111,%rax    // present, r/w, user/supervisor access, no pwt nor pcd
-    mov     %r8,%rdi
-    btsq    $MIRROR_BIT,%rdi        
-    mov     %rax,(%rdi)              // 1st entry in PLM4
-    mov     $PDPTTABLE,%rax
-    or      $0b111,%rax
-    mov     %rax,(8*128)(%rdi)       // 128th entry for mirror
-
-    // clear the PDPT table
-    mov     %rbx,%rdi
-    btsq    $MIRROR_BIT,%rdi        
-    mov     $512,%rcx          
-    xor     %rax,%rax
-    rep     stosq
-
-    // Then reserve another 4 4k pages in physical memory to hold a 4 PD table 
-    // each addressing 1gig, for a total of 4gig
-    // this will return the physical address of the page in rax
-    mov     $(MAX_RAM/(1024*1024*1024)),%rdi                 
-    mov     $0b011000000000,%rsi
-    call    allocatePhysicalPages       
-    // At this point, rax contains the physical address of the 1st PD table
-
-    // Create the PDPT entries from the PD address.
-    mov     %rbx,%rdi
-    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
-    mov     %rbx,%r11       // we will use PDPT address to create identiry mapping later
-    mov     %rax,%rbx
-    or      $0b000000000111,%rax    // present, r/w, user/supervisor access, no pwt nor pcd
-    mov     $(MAX_RAM/(1024*1024*1024)),%rcx   
-1:  stosq
-    add     $0x1000,%rax         // next PD table is 4k further 
-    loop    1b
-
-    // clear the PD tables
-    mov     %rbx,%rdi
-    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
-    mov     $(512*(MAX_RAM/(1024*1024*1024))),%rcx      
-    xor     %rax,%rax
-    rep     stosq
-
-    // create the page directory entries that points to 2mb kernel pages
-    // The first 128meg is addressible as 2meg pages. so the first 64 entries
-    // will be created as 2meg pages. The rest as 4k pages
-    mov     %rbx,%rdi
-    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
-    mov     $0b0010010000111,%rax           // Start at address 0. present, rw, US, in use by kernel 
-    mov     $(KERNEL_RESERVED_END/(2*1024*1024)),%rcx   // 128meg /  2mb  = 64 entries
-1:  stosq
-    add     $0x200000,%rax                  // next page start 2mb further
-    loop    1b
-    mov     %rdi,%r10
-
-    // For the rest of the pages (from 128meg to 4gig = 1984 entries) we need to 
-    // create page tables that will map 4k pages. 
-    mov     $((MAX_RAM-KERNEL_RESERVED_END)/(2*1024*1024)),%rdi
-    mov     $0b011000000000,%rsi
-    call    allocatePhysicalPages       // rax will contain base adress
-    mov     %rax,%r9                    // r9 = begining of 4k page directories
-
-
-    // Fill the rest of the PD tables to point to the page tables
-    // At this point, r10=next PD entry, rax=PT address    
-    // Each Page tables addresses 2 megs so we need 
-    // (MAX_RAM-KERNEL_RESERVED_END)/(2*1024*1024) entries
-    mov     %r10,%rdi
-    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
-    or      $0b111,%rax
-    mov     $((MAX_RAM-KERNEL_RESERVED_END)/(2*1024*1024)),%rcx
-1:  stosq                       
-    add     $0x1000,%rax    // the next PT is 4k further        
-    loop    1b
-
-    // Finaly, we fill in the page tables. r9=address of first table
-    // and all tables are continguous (see note in function header)
-    // only do this up to stack top since mmio will follow
-    // Each pages are 4k, so we need ((stacktop-KERNEL_RESERVED_END)/4096) descriptors
-    mov     %r9,%rdi
-    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
-    xor     %rax,%rax
-    //mov     $(KERNEL_RESERVED_END|0b111),%rax 
-    mov     $((STACK0TOP_VIRTUAL_ADDRESS-KERNEL_RESERVED_END)/4096),%rcx  // Each of those 4k pages will be unused for now
-1:  stosq
-    //add     $0x1000,%rax
-    loop    1b
-
-    // now map mmio (above stack)
-    mov     $(STACK0TOP_VIRTUAL_ADDRESS|0b111),%rax 
-    mov     $((MAX_RAM-STACK0TOP_VIRTUAL_ADDRESS)/4096),%rcx  // Each of those 4k pages will be unused for now
-1:  stosq
-    add     $0x1000,%rax
-    loop    1b
-
-
-
-
-    // create the PDPT entries for identity mapping after 256th gig
-    // Within the first 512gig of addressing space, the last 256 will be
-    // identity mapped to the bottom 256gig.
-    // We will copy the kernel's PDPT entries so that we can reuse
-    // its page directories that points to the identity tables
-
-
-    /* // rdi=PDPE for the the 256th gig
-    mov     %r11,%rdi
-    btsq    $MIRROR_BIT,%rdi        
-    add     $(256*8),%rdi  
-    // rsi=PDPE of kernel pages
-    mov     $PDPTTABLE,%rsi
-    add     $(256*8),%rsi
- 
-    mov     $(MAX_RAM/(1024*1024*1024)),%rcx
-    rep movsq*/
-
-    pop     %r11
-    pop     %r10
-    pop     %rcx
-    pop     %rbx
+    pop     %rdx
     pop     %rsi
     pop     %rdi
     pop     %rax
@@ -880,16 +744,14 @@ isMirrorPageDirty:
 
 
 /*
+    This structure is temporary. It is set while still in 32bit protected mode before
+    doing the switch to long mode. Once in long mode, we will setup another paging
+    structure that will be more versatile
         there are 4 levels:
             PLM4 is a table with 512 64bit entries that references PDPTs. 1 PDPT references 512 gig.
                 the PLM4 table is 4k
             PDPT: table of 512 64bit entries that references PDs. 1PD references 1gig. Each PDPT is 4k
             PD: 512 64entries that references a 2mb page or a PT. Each PD is 4k
-
-        We will only address 4gig of mem. So:
-            in the PLM4, we will use the 1st entry and mark the remaining 511 entries as invalid.
-                we will thus create only 1 PDPT. In the PDPT we will use the 1st 4 entries and mark all other 508 as invalid
-                    we will thus create only 4 PDs.
 
 */
 .code32
@@ -935,53 +797,6 @@ createPDPTEntry:
     xor     %ebx,%ebx           /*We will not have any page that will address over 4gig. so it is all zeros here*/
     mov     $0b0010010000111,%eax           /*Start at address 0. present, rw, US, in use by kernel */
     mov     $(KERNEL_RESERVED_END/(2*1024*1024)),%ecx   // kernel space is in 2mb page           
-1:  mov     %eax,(%edi)
-    mov     %ebx,4(%edi)
-    add     $8,%edi
-    add     $0x200000,%eax        /* next page start 2mb further */
-    loop    1b
-
-    // The rest of PDEs point to page tables for 4k mapping. These are
-    // the rest of PDEs
-    mov     $(PAGETABLES|0b111),%eax
-    mov     $((MAX_RAM-KERNEL_RESERVED_END)/(2*1024*1024)),%ecx   
-1:  mov     %eax,(%edi)
-    mov     %ebx,4(%edi)
-    add     $8,%edi
-    add     $0x1000,%eax        // next page start 2mb further 
-    loop    1b
-
-    // create the PT entries. These are the 4k page entries in page tables. 
-    // Identity mapping. 
-    mov     $PAGETABLES,%edi
-    xor     %ebx,%ebx       // dont need the upper part since OS only supports 4gig
-    mov     $(KERNEL_RESERVED_END|0b111),%eax
-    mov     $((MAX_RAM-KERNEL_RESERVED_END)/4096),%ecx   
-1:  mov     %eax,(%edi)
-    mov     %ebx,4(%edi)
-    add     $8,%edi
-    add     $0x1000,%eax        /* next page start 4k further */
-    loop    1b
-
-    // Now create the PDPT entries for identity mapping after 256th gig
-    // Within the first 512gig of addressing space, the last 256 will be
-    // identity mapped to the bottom 256gig.
-    mov     $(PDPTTABLE+(256*8)),%edi   // start at gig 512
-    mov     $PDTABLEIDENTITY ,%eax 
-    or      $0b000000000111,%eax        // Present, r/w, user/supervisor access, no pwt nor pcd*/
-    xor     %ebx,%ebx       
-    mov     $4,%ecx         
-1:  mov     %eax,(%edi)
-    mov     %ebx,4(%edi)
-    add     $8,%edi
-    add     $0x1000,%eax        /* next PD table is 4k further */
-    loop    1b 
-    // create the page directory entries. Note that each PD are one after the other in memory
-    // This is the actual mapping of memory
-    mov     $PDTABLEIDENTITY,%edi
-    xor     %ebx,%ebx           /*We will not have any page that will address over 4gig. so it is all zeros here*/
-    mov     $0b0010010000111,%eax     
-    mov     $(MAX_RAM/(2*1024*1024)),%ecx   
 1:  mov     %eax,(%edi)
     mov     %ebx,4(%edi)
     add     $8,%edi

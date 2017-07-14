@@ -1,5 +1,6 @@
-#define MAX_RAM (4*1024*1024*1024)
-#define MAX_RAM_CONSTANT_FOR_C ((4LL)*(1024LL)*(1024LL)*(1024LL))
+#define RAM_COUNT_GIG 4
+#define MAX_RAM (RAM_COUNT_GIG*1024*1024*1024)
+#define MAX_RAM_CONSTANT_FOR_C ((RAM_COUNT_GIG)*(1024LL)*(1024LL)*(1024LL))
 
 #define TSS             0x00000500
 #define SOFTIRQLIST     0x00000600
@@ -21,7 +22,6 @@
 #define PML4TABLE       0x00008000      // needs to be 4k aligned. we only use 1 entry
 #define PDPTTABLE       0x00009000      // needs to be 4k aligned. we only use 4 entries (so 16bytes). 1 PDPT covers 512gig, so only 2 tables is needed
 #define PDTABLE         0x0000A000      // need to be 4k aligned. enough space for 4 page directories (4gig total)
-#define PDTABLEIDENTITY 0x0000E000      // need to be 4k aligned. enough space for 4 page directories (4gig total)
 #define RESERVED5       0x00012000
 #define RESERVED5END    0x0000FFFF
 #define PRDT1           0x00010000
@@ -62,6 +62,9 @@
 #define PROCESS_VMCS (PROCESS_HEAP_ADDRESS+8)
 #define VIDEO_POINTER (PROCESS_VMCS+8)
 
+//TODO: make sure nothing overlaps in the following range
+#define PROCESS_MMIO_START 0xFE010000
+#define PROCESS_MMIO_END 0x100000000
 
 #define IDENTITY_MAPPING   0x4000000000
 

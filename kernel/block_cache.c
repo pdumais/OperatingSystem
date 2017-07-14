@@ -284,8 +284,16 @@ int block_cache_read(unsigned long blockNumber, int dev, char* buffer, unsigned 
 
 void schedule_io(int dev)
 {
+    unsigned long interruptsFlags;
+
     // We prioritize read requests over writes. write requests will be delayed until
     // no more read requests. Again, this is not optimal, so it should be reworked
+    // We clear interrupts because an interrupt for a previous block could trigger
+    // while we are here after we locked the spin lock. The interrupt would run within
+    // the same task and would also try to lock so this would cause a deadlock.
+    // This is obviously not pretty. This function should be refactored to use
+    // a lockless algorithm if possible
+    CLI(interruptsFlags);
     spinLock(&scheduleio_lock);
     struct block_cache_entry* entry = getFirstPendingReadCacheEntry(dev);
 
@@ -295,6 +303,7 @@ void schedule_io(int dev)
         if (block_read(dev, entry->block, entry->data, 1))
         {
             spinUnlock(&scheduleio_lock);
+            STI(interruptsFlags);
             return;
         }
         entry->state = BLOCK_CACHE_PENDING_READ;
@@ -310,6 +319,7 @@ void schedule_io(int dev)
         }
     }
     spinUnlock(&scheduleio_lock);
+    STI(interruptsFlags);
 }
 
 bool transitionFromIdle(struct block_cache_entry* cacheEntry, uint8_t newstate)

@@ -163,6 +163,7 @@ launchKernelThread:
     push    %rdi
     push    %rsi
     call    createKernelThread
+
     call    addTaskInList
     pop     %rsi
     pop     %rdi
@@ -403,6 +404,13 @@ addTaskInList:
     push    %rax
     push    %rbx
     push    %rdx
+/*push %rax
+mov %cr3,%rax
+cmp $0x8000,%rax
+je 1f
+int $3
+1:
+pop %rax*/
     
 1:  mov     $TASKLIST_BASE,%r8
     mov     $(TASKLISTEND+1),%rcx
