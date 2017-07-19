@@ -41,6 +41,8 @@ main:
     mov     $0,%ax
     mov     %ax,%gs
 
+    call    detect_memory
+
 	// enable A20 line adressing
 	call    a20wait
 	mov     $0xAD,%al
@@ -73,6 +75,7 @@ main:
     mov     %eax,%cr0   /* protected mode */
     mov     $0x08,%bx
     mov     %bx,%fs
+    mov     %bx,%es
     and     $0xFE,%al  /* Back to real mode. es will still be a valid 32bit segment because cached value not cleared */
     mov     %eax,%cr0
 
@@ -140,6 +143,22 @@ printchar:  /* param: al=char */
     int     $0x10
     popl    %ecx
     popl    %ebx
+    ret
+
+detect_memory:
+    push    %es    
+    mov     $(MEMMAP >> 4),%ax
+    mov     %ax,%es
+    mov     $0,%di
+    mov     $0,%bx
+1:  mov     $24,%cx
+    mov     $0x534d4150,%edx
+    mov     $0xe820,%ax
+    int     $0x15
+    add     $24,%di
+    cmp     $0,%bx
+    jne     1b
+    pop     %es
     ret
 
 

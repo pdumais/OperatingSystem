@@ -41,6 +41,7 @@ DYNAMIC ALLOCATION:
         0b001: physical memory pointed to by this page is also mapped somewhere else and is a stack page for a thread
         0b010: physical memory pointed to by this page is used by the kernel
         0b011: physical memory pointed to by this page is used as heap for a thread or the kernel
+        0b100: physical memory pointed to by this page reserved and cannot be used as free memory
 
 */
 

@@ -59,6 +59,7 @@ mainkernelthread:
 
 
     call    initPCI
+    call    show_memory_map
 
     mov     $BLOCK_CACHE,%rdi        // blockNumber 242
     call    block_cache_init

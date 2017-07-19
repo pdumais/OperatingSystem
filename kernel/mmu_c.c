@@ -1,13 +1,50 @@
 #include "includes/kernel/types.h"
 #include "../memorymap.h"
 #include "macros.h"
+#include "printf.h"
 
 typedef uint64_t PML4E;
 typedef uint64_t PDPTE;
 typedef uint64_t PDE;
 typedef uint64_t PTE;
 
+typedef struct
+{
+    uint64_t address;
+    uint64_t size;
+    uint32_t type;
+    uint32_t ext;
+} mem_map_entry;
+
 extern void* kernelAllocPages(uint64_t pageCount);
+
+bool is_page_reserved(uint64_t address)
+{
+    mem_map_entry* m = (mem_map_entry*)MEMMAP;
+    while (m->size != 0)
+    {
+        if (m->type == 1)
+        {
+            if (address >= m->address && address < (m->address+m->size)) return false;
+        }
+        m++;
+    }
+    return true;
+}
+
+void show_memory_map()
+{
+    mem_map_entry* m = (mem_map_entry*)MEMMAP;
+    pf("Usable memory: \r\n");
+    while (m->size != 0)
+    {
+        if (m->type == 1)
+        {
+            pf("\tRegion: %X-%X\r\n",m->address,(m->address+m->size));
+        }
+        m++;
+    }
+}
 
 void setup_kernel_page_structure(uint64_t num_gig)
 {
@@ -70,7 +107,17 @@ void setup_kernel_page_structure(uint64_t num_gig)
         PTE* pt = (PTE*)pageTableAddress;
         for (i=0;i<512;i++)
         {
-            pt[i] = (PTE*)(virtual_address | 0b111LL);
+
+            // Using the data returned by BIOS e820, we will mark
+            // all non-free addresses with AVL=0b100 so that the page allocation
+            // algorithm does not use that physical memory to map on a virtual address
+            // for a process
+            uint64_t avl = 0;
+            if (is_page_reserved(virtual_address))
+            {   
+                avl = (0b100 << 9);
+            }
+            pt[i] = (PTE*)(virtual_address | 0b111LL | avl);
             virtual_address += 0x1000LL;
         }
         pageTableAddress += 0x1000LL;

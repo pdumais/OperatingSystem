@@ -1,4 +1,4 @@
-#define RAM_COUNT_GIG 8
+#define RAM_COUNT_GIG 32
 #ifdef __ASSEMBLER__
 #define MAX_RAM (RAM_COUNT_GIG*1024*1024*1024)
 #else
@@ -9,8 +9,8 @@
 #define SOFTIRQLIST     0x00000600
 #define GDT             0x00000608
 #define SOCKETSLIST     0x00000708
-#define RESERVED3       0x00000710
-#define RESERVED3END    0x00000BFF
+#define MEMMAP          0x00000710
+#define MEMMAPEND       0x00000BFF
 #define IOAPICHANDLERS  0x00000C00      
 #define RESERVED2       0x00001C00      
 #define RESERVED2END    0x00001FFF      

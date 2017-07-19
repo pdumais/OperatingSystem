@@ -78,7 +78,7 @@ void pf(char * fmt,...)
             else if (*fmt=='X')
             {
                 unsigned long v = va_arg(list,unsigned long);
-                //TODO: show 16digits HEX value
+                stIndex += itoh(v,(char*)&st[stIndex],16);
             }
         }
         fmt++;
