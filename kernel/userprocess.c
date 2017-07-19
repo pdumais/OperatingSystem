@@ -165,7 +165,7 @@ void destroyProcessMemory(uint64_t pml4)
     // pages, but I prefer to leave the control here. We can
     // validate that the page is not a mirror page etc..
 
-    for (virtualAddress = KERNEL_RESERVED_END; virtualAddress < MAX_RAM_CONSTANT_FOR_C; virtualAddress += 0x1000)
+    for (virtualAddress = KERNEL_RESERVED_END; virtualAddress < MAX_RAM; virtualAddress += 0x1000)
     {
         uint64_t phys = (uint64_t)virt2phys(virtualAddress,pml4);
         uint64_t pageFlags = phys&0x8000000000000FFF;

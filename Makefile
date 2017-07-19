@@ -24,7 +24,7 @@ net:
 	/usr/local/bin/ovs-vsctl add-port br0 tap100
 run: net
 	qemu-system-x86_64 --enable-kvm -cpu host -smp 4 -option-rom sgabios.bin \
-		-m 4096 -rtc base=localtime \
+		-m 8192 -rtc base=localtime \
 		-monitor stdio -curses \
 		-drive file=image/disk.img,if=ide \
 		-drive file=userapps/disk.img,if=virtio \
@@ -35,7 +35,7 @@ run: net
 
 test: net
 	qemu-system-x86_64 --enable-kvm -cpu host -smp 4 -option-rom sgabios.bin \
-		-m 4096 -rtc base=localtime \
+		-m 8192 -rtc base=localtime \
 		-monitor telnet:127.0.0.1:2048,server,nowait,ipv4 -curses \
 		-drive file=image/disk.img,if=ide \
 		-drive file=userapps/disk.img,if=virtio \

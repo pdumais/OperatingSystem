@@ -8,6 +8,7 @@ typedef uint64_t PDE;
 typedef uint64_t PTE;
 
 extern void* kernelAllocPages(uint64_t pageCount);
+
 void setup_kernel_page_structure(uint64_t num_gig)
 {
     uint64_t i,n;
@@ -25,7 +26,7 @@ void setup_kernel_page_structure(uint64_t num_gig)
     // For each gig that we support, create a PD 
     i = 0;
     uint64_t firstPDAddress = PDTABLE;
-    n - num_gig;
+    n = num_gig;
     while (n)
     {
         

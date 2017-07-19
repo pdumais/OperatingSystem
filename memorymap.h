@@ -1,6 +1,9 @@
-#define RAM_COUNT_GIG 4
+#define RAM_COUNT_GIG 8
+#ifdef __ASSEMBLER__
 #define MAX_RAM (RAM_COUNT_GIG*1024*1024*1024)
-#define MAX_RAM_CONSTANT_FOR_C ((RAM_COUNT_GIG)*(1024LL)*(1024LL)*(1024LL))
+#else
+#define MAX_RAM ((RAM_COUNT_GIG)*(1024LL)*(1024LL)*(1024LL))
+#endif
 
 #define TSS             0x00000500
 #define SOFTIRQLIST     0x00000600
@@ -20,10 +23,9 @@
 #define RESERVED1       0x00007000
 #define RESERVED1END    0x00007FFF
 #define PML4TABLE       0x00008000      // needs to be 4k aligned. we only use 1 entry
-#define PDPTTABLE       0x00009000      // needs to be 4k aligned. we only use 4 entries (so 16bytes). 1 PDPT covers 512gig, so only 2 tables is needed
-#define PDTABLE         0x0000A000      // need to be 4k aligned. enough space for 4 page directories (4gig total)
-#define RESERVED5       0x00012000
-#define RESERVED5END    0x0000FFFF
+#define PDPTTABLE       0x00009000      // only 1 table is needed (512 gig) 
+#define RESERVED5       0x0000A000
+#define RESERVED5END    0x000FFFFF
 #define PRDT1           0x00010000
 #define PRDT2           0x00010010
 #define TASKLIST_BASE   0x00020000
@@ -33,20 +35,25 @@
 #define AP_STACKS       0x00070000      // 64 256bytes stacks for max 64 CPUs
 #define AP_STACKS_END   0x00077FFF
 #define KERNEL_BASE     0x00100000       
-#define PAGETABLES      0x00200000      // 4k per tables. we have 4*512 tables, so 8meg. That will cover 4gig of ram
+#define PDTABLE         0x00200000      // need to be 4k aligned. enough space for 512 tables
+#define PAGETABLES      0x00400000      
 #define PAGETABLES_SIZE ((MAX_RAM/4096)*8)
 #define PAGETABLES_END  (PAGETABLES+PAGETABLES_SIZE-1)
+//TODO: page tables can grow up to KERNEL_RESERVED_END. But using less than
+//      that is a waste, and we cant use more (current limit of 523264 tables (256gig)
+
 
 // this is where heap will start. anything under this is 2mb pages.
 // Everything over is 4k pages
 #define KERNEL_RESERVED_END 0x08000000     
 
 // Process virtual memoty
-#define STACK3_DEPTH (20*1024*1024)
 #define THREAD_CODE_START KERNEL_RESERVED_END
-#define STACK3TOP_VIRTUAL_ADDRESS    0xFDFFC000 
-#define STACK0TOP_VIRTUAL_ADDRESS    0xFE000000 //this can't be more than 4pages since ring3 stack top is 16k below it
-#define META_VIRTUAL_ADDRESS         0xFE000000 // right after the stack 
+//#define META_VIRTUAL_ADDRESS         0xFE000000 // right after the stack 
+#define META_VIRTUAL_ADDRESS         ((MAX_RAM)-0x2000000) 
+#define STACK0TOP_VIRTUAL_ADDRESS    (META_VIRTUAL_ADDRESS) //this can't be more than 4pages since ring3 stack top is 16k below it
+#define STACK3TOP_VIRTUAL_ADDRESS    (STACK0TOP_VIRTUAL_ADDRESS-0x4000) 
+#define STACK3_DEPTH (20*1024*1024)
 #define STACK3BOTTOM_VIRTUAL_ADDRESS (STACK3TOP_VIRTUAL_ADDRESS-STACK3_DEPTH)
 #define PAGE_GUARD                   (STACK3BOTTOM_VIRTUAL_ADDRESS-0x1000)
 #define HEAP_TOP                     PAGE_GUARD
@@ -62,14 +69,11 @@
 #define PROCESS_VMCS (PROCESS_HEAP_ADDRESS+8)
 #define VIDEO_POINTER (PROCESS_VMCS+8)
 
-//TODO: make sure nothing overlaps in the following range
-#define PROCESS_MMIO_START 0xFE010000
-#define PROCESS_MMIO_END 0x100000000
+// MMIO. 
+#define APIC_BASE       0xFEE00000
 
 #define IDENTITY_MAPPING   0x4000000000
 
-// MMIO
-#define APIC_BASE       0xFEE00000
 
 // Segment selectors
 #define TSSSELECTOR     (0x20)

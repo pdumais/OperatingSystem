@@ -222,6 +222,7 @@ allocateStackPage:
     ret
 
 // This function is thread-safe and multi-processor safe
+// This reserves a page and marks it by use for a process heap
 // rdi = number of page
 allocateHeapPage:
     push    %rsi
