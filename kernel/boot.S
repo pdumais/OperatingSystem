@@ -287,3 +287,69 @@ GDTDATA:
     .BYTE 0x00
 
 GDTDATA_END:
+
+/*                                                                                    
+    This structure is temporary. It is set while still in 32bit protected mode before 
+    doing the switch to long mode. Once in long mode, we will setup another paging       
+    structure that will be more versatile                                             
+        there are 4 levels:                                                           
+            PLM4 is a table with 512 64bit entries that references PDPTs. 1 PDPT references 512 gig.
+                the PLM4 table is 4k                                                  
+            PDPT: table of 512 64bit entries that references PDs. 1PD references 1gig. Each PDPT is 4k
+            PD: 512 64entries that references a 2mb page or a PT. Each PD is 4k          
+                                                                                      
+*/                                                                                    
+.code32                                                                               
+setupPageStructure:                                                                   
+    push    %eax                                                                      
+    push    %ebx                                                                      
+    push    %edi                                                                      
+    push    %ecx                                                                      
+                                                                                      
+    // create 1 PML4 entry (because it is good for 512gig)                            
+    mov     $PML4TABLE,%edi                                                           
+    mov     $1024,%ecx          /*clear the table first*/                             
+    xor     %eax,%eax                                                                 
+    rep     stosl                                                                     
+    mov     $PML4TABLE,%edi                                                           
+    mov     $PDPTTABLE,%eax /* This address is aligned on 4kboundary. So bit0-11 are cleared*/
+    or      $0b000000000111,%eax /* present, r/w, user/supervisor access, no pwt nor pcd*/
+    xor     %ebx,%ebx       /* upper 32bit of PML4 entry. address=0 because below 4G. NX=0*/
+    mov     %eax,(%edi)                                                               
+    mov     %ebx,4(%edi)                                                              
+    mov     %eax,(8*128)(%edi)   // same entry for #256 for mirror                    
+                                                                                      
+    // Create the PDPT with 4 entries. Each entry describres 1 gig                    
+    mov     $PDPTTABLE,%edi                                                           
+    mov     $1024,%ecx          /*clear the table first*/                             
+    xor     %eax,%eax                                                                 
+    rep     stosl                                                                     
+    mov     $PDPTTABLE,%edi                                                           
+    mov     $PDTABLE,%eax /* This address is aligned on 4kboundary. So bit0-11 are cleared*/
+    or      $0b000000000111,%eax /* present, r/w, user/supervisor access, no pwt nor pcd*/
+    xor     %ebx,%ebx       /* upper 32bit of PML4 entry. address=0 because below 4G. NX=0*/
+    mov     $4,%ecx         /* we need 4 of those entries that can address 1g each */  
+createPDPTEntry:                                                                      
+    mov     %eax,(%edi)                                                               
+    mov     %ebx,4(%edi)                                                              
+    add     $8,%edi                                                                   
+    add     $0x1000,%eax        /* next PD table is 4k further */                     
+    loop    createPDPTEntry                                                           
+                                                                                      
+    // 2mb PDEs. The first 128mb are 2mb pages reserved for kernel                    
+    // 64 first entries in the first Page Directory point to 1st 128mb                
+    mov     $PDTABLE,%edi                                                             
+    xor     %ebx,%ebx           /*We will not have any page that will address over 4gig. so it is all zeros here*/
+    mov     $0b0010010000111,%eax           /*Start at address 0. present, rw, US, in use by kernel */
+    mov     $(KERNEL_RESERVED_END/(2*1024*1024)),%ecx   // kernel space is in 2mb page    
+1:  mov     %eax,(%edi)                                                               
+    mov     %ebx,4(%edi)                                                              
+    add     $8,%edi                                                                   
+    add     $0x200000,%eax        /* next page start 2mb further */                   
+    loop    1b                                                                        
+                                                                                      
+    pop     %ecx                                                                      
+    pop     %edi                                                                      
+    pop     %ebx                                                                      
+    pop     %eax                                                                      
+    ret                                                                                                             
