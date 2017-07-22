@@ -14,7 +14,6 @@
 .global smpUp
 .global get_apic_address
 
-.extern markPageAsInUse
 .extern schedulerHandler
 
 #define APIC_BASE_MSR                       0x1B
@@ -235,11 +234,6 @@ initSMPForBST:
     GET_APIC_ID(%eax)
     mov     $STARTEDCPUS,%rdi
     btsq    %rax,(%rdi)
-
-    mov     $APIC_BASE,%rcx
-    mov     $APIC_BASE,%rax
-    mov     $PAGETABLES,%rdi
-    call    markPageAsInUse     // make sure it wont be used in heap
 
     call    startAllCPUs
 exitInitSMP:
@@ -619,8 +613,12 @@ getTimerValues:
 ////////////////////////////////////////////////////////////////////////////////////
 ackAPIC:
     push    %rax
+    push    %rdi
     mov     $1,%rax
-    mov     %eax,APIC_BASE+APIC_REG_EOI
+    mov     $(APIC_BASE+APIC_REG_EOI),%rdi
+    btsq    $MIRROR_BIT,%rdi
+    mov     %eax,(%rdi)
+    pop     %rdi
     pop     %rax
     ret
 
@@ -636,6 +634,7 @@ ioAPICRead:
     shl     $4,%rdi
     add     $IOAPICINFO+8,%rdi
     mov     (%rdi),%rdi
+    btsq    $MIRROR_BIT,%rdi
 
     mov     %esi,(%rdi)
     mov     16(%rdi),%eax
@@ -652,6 +651,7 @@ ioAPICWrite:
     shl     $4,%rdi
     add     $IOAPICINFO+8,%rdi
     mov     (%rdi),%rdi
+    btsq    $MIRROR_BIT,%rdi
     mov     %esi,(%rdi)
     mov     %edx,16(%rdi)
     pop     %rdi
@@ -1053,6 +1053,7 @@ sendIPI:
     pushfq
     cli
     mov         $APIC_BASE,%rax
+    btsq        $MIRROR_BIT,%rax
 1:  btl         $12,APIC_REG_INTERRUPTCOMMANDLOW(%rax)
     jc          1b
     popfq

@@ -70,7 +70,7 @@ void createUserProcess(struct UserProcessInfo* upi)
     stack[-2] = (uint64_t)STACK3TOP_VIRTUAL_ADDRESS;    // rsp
     stack[-3] = 0x200202;                               // rflags
     stack[-4] = RING3CSSELECTOR|3;                      // cs with RPL =3
-    stack[-5] = 0x08000000;                             // rip
+    stack[-5] = THREAD_CODE_START;                      // rip
 
     // This portion is for context restore
     stack[-6] = 0;                                      // rax
@@ -165,7 +165,7 @@ void destroyProcessMemory(uint64_t pml4)
     // pages, but I prefer to leave the control here. We can
     // validate that the page is not a mirror page etc..
 
-    for (virtualAddress = KERNEL_RESERVED_END; virtualAddress < MAX_RAM; virtualAddress += 0x1000)
+    for (virtualAddress = THREAD_CODE_START; virtualAddress < MAX_RAM; virtualAddress += 0x1000)
     {
         uint64_t phys = (uint64_t)virt2phys(virtualAddress,pml4);
         uint64_t pageFlags = phys&0x8000000000000FFF;

@@ -1,4 +1,4 @@
-#define RAM_COUNT_GIG 32
+#define RAM_COUNT_GIG 16
 #ifdef __ASSEMBLER__
 #define MAX_RAM (RAM_COUNT_GIG*1024*1024*1024)
 #else
@@ -35,21 +35,27 @@
 #define AP_STACKS       0x00070000      // 64 256bytes stacks for max 64 CPUs
 #define AP_STACKS_END   0x00077FFF
 #define KERNEL_BASE     0x00100000       
-#define PDTABLE         0x00200000      // need to be 4k aligned. enough space for 512 tables
-#define PAGETABLES      0x00400000      
+#define KERNEL_END      0x00200000       
+
+// Anything above this space is not mapped in user process.
+// Anything below, is mapped in user process
+#define PDTABLE         KERNEL_END     // need to be 4k aligned. enough space for 512 tables
+#define PAGETABLES      (PDTABLE+0x00200000)
 #define PAGETABLES_SIZE ((MAX_RAM/4096)*8)
 #define PAGETABLES_END  (PAGETABLES+PAGETABLES_SIZE-1)
-//TODO: page tables can grow up to KERNEL_RESERVED_END. But using less than
-//      that is a waste, and we cant use more (current limit of 523264 tables (256gig)
 
-
-// this is where heap will start. anything under this is 2mb pages.
+// this is where available pages will start.
 // Everything over is 4k pages
-#define KERNEL_RESERVED_END 0x08000000     
+#define KERNEL_RESERVED_END (PAGETABLES_END+1)
 
+
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
 // Process virtual memoty
-#define THREAD_CODE_START KERNEL_RESERVED_END
-//#define META_VIRTUAL_ADDRESS         0xFE000000 // right after the stack 
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+#define THREAD_CODE_START 0x02000000
+//#define THREAD_CODE_START (KERNEL_RESERVED_END)
 #define META_VIRTUAL_ADDRESS         ((MAX_RAM)-0x2000000) 
 #define STACK0TOP_VIRTUAL_ADDRESS    (META_VIRTUAL_ADDRESS) //this can't be more than 4pages since ring3 stack top is 16k below it
 #define STACK3TOP_VIRTUAL_ADDRESS    (STACK0TOP_VIRTUAL_ADDRESS-0x4000) 

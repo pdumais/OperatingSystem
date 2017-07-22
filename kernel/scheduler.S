@@ -232,7 +232,7 @@ createKernelThread:
 
     // create firt heap page
     add     $0x4000,%rax        // now rax= meta page
-    movq    $KERNEL_RESERVED_END,(PROCESS_HEAP_ADDRESS-META_VIRTUAL_ADDRESS)(%rax)
+    movq    $THREAD_CODE_START,(PROCESS_HEAP_ADDRESS-META_VIRTUAL_ADDRESS)(%rax)
     mov     $1,%rdi
     call    allocateHeapPage
     push    %rax

@@ -1,6 +1,6 @@
 ENTRY(main)
 SECTIONS {
-    . = (0x08000200);
+    . = (0x02000200);
     .text : {
         * (.text);
     }

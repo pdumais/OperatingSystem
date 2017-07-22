@@ -41,7 +41,7 @@ main:
     mov     %ax,%gs
     mov     %ax,%ss
 
-    GET_APIC_ID(%eax)
+    GET_APIC_ID32(%eax)
     cmp     $64,%eax            // we don't support more than 64 CPUs
     jb      1f
     mov     $0xDEADBEEF,%eax

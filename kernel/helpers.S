@@ -46,10 +46,11 @@ cant_yield:
 */
 getPageDescriptorAddress:
     mov     %rdi,%rax
-    sub     $KERNEL_RESERVED_END,%rax // because PAGETABLES maps memory after KERNEL_RESERVED_END only
+    sub     $THREAD_CODE_START,%rax 
     shr     $12,%rax    /* divide by 4k, then mul by 8bytes per entry = >>12, <<3 */ 
     shl     $3,%rax    /* divide by 4k, then mul by 8bytes per entry = >>12, <<3 */ 
     add     $PAGETABLES,%rax
+    btsq    $MIRROR_BIT,%rax
     ret
 
 

@@ -2,6 +2,7 @@
 #include "../memorymap.h"
 #include "macros.h"
 #include "printf.h"
+#include "utils.h"
 
 typedef uint64_t PML4E;
 typedef uint64_t PDPTE;
@@ -77,6 +78,8 @@ void setup_kernel_page_structure(uint64_t num_gig)
 
     
     // create the 2mb mappings of kernel area 
+    // Kernel wants the entire section including page tables
+    // these are defined until KERNERL_RESERVED_END
     n = (KERNEL_RESERVED_END/(2*1024*1024));
     uint64_t pdptindex = 0;
     uint64_t pdindex = 0;
@@ -98,6 +101,12 @@ void setup_kernel_page_structure(uint64_t num_gig)
 
 
     // Now do the 4k mapping of the rest of memory.
+    // Those tables will be used as identity memory and also
+    // as a structure to mark pages free or not
+    // We technically don't need these entries since kernel code
+    // wont run anymore after processes are started so this pml4 will not
+    // be used. We could simply use a bitmap to track free pages.
+    // but these tables are referenced by all processes for the mirror space
     virtual_address = KERNEL_RESERVED_END;
     uint64_t pageTableAddress = PAGETABLES;
     while (pdptindex < num_gig)
@@ -121,6 +130,15 @@ void setup_kernel_page_structure(uint64_t num_gig)
             virtual_address += 0x1000LL;
         }
         pageTableAddress += 0x1000LL;
+        
+        // we also need to check if the page that will contain the pagetable
+        // is reserved. Otherwise we will end up creating a page table
+        // in reserved memory. We should avoid that, but for now, let's 
+        // just crash :)
+        if (is_page_reserved(pageTableAddress))
+        {
+            C_BREAKPOINT_VAR(0xDEADBEEF,0x66778899,pageTableAddress,0);
+        }
         pdindex++;
         if (pdindex >= 512)
         {
@@ -139,10 +157,9 @@ void setup_kernel_page_structure(uint64_t num_gig)
 //          look at mapPhysOnVirtualAddressSpace in mmu.S
 //
 ///////////////////////////////////////////////////////////////////////////////////////
-void add_process_mapping(uint64_t virt, uint64_t phys, uint64_t pageCount, uint64_t pagetableAddress)
+/*void add_process_mapping(uint64_t virt, uint64_t phys, uint64_t pageCount, uint64_t pagetableAddress)
 {
-
-    pagetableAddress += ((virt - KERNEL_RESERVED_END)/4096)*8;
+    pagetableAddress += ((virt - THREAD_CODE_START)/4096)*8;
     while (pageCount)
     {
         PTE* pte = (PTE*)pagetableAddress;
@@ -151,7 +168,7 @@ void add_process_mapping(uint64_t virt, uint64_t phys, uint64_t pageCount, uint6
         phys+=0x1000;    
         pageCount--;
     }
-}
+}*/
 
 uint64_t setup_process_page_structure(uint64_t num_gig, uint64_t* pml4Address, uint64_t* pagetableAddress)
 {
@@ -179,7 +196,7 @@ uint64_t setup_process_page_structure(uint64_t num_gig, uint64_t* pml4Address, u
     }
 
     // Create 2meg entries for kernel mapping
-    n = (KERNEL_RESERVED_END/(2*1024*1024));
+    n = (KERNEL_END/(2*1024*1024));
     uint64_t pdindex = 0;
     uint64_t pdptindex = 0;
     uint64_t address = 0;
@@ -197,21 +214,24 @@ uint64_t setup_process_page_structure(uint64_t num_gig, uint64_t* pml4Address, u
         }
     } 
 
-    // Now do the 4k mapping of the rest of memory.
-    address = KERNEL_RESERVED_END;
-    uint64_t pageCount = ((num_gig*1024*1024*1024) - (KERNEL_RESERVED_END))/(2*1024*1024);
-    uint64_t pageTableAddress = kernelAllocPages(pageCount);
+    // Now do the 4k mapping of the rest of memory that is available from THREAD_CODE_START
+    address = THREAD_CODE_START;
+    uint64_t pageTablesCount = ((num_gig*1024*1024*1024) - (THREAD_CODE_START))/(2*1024*1024);
+    uint64_t pageTableAddress = kernelAllocPages(pageTablesCount);
     *pagetableAddress = UNMIRROR(pageTableAddress);
+
+    pdindex = (address>>(12+9))&0xFFF;
+    pdptindex = (address>>(12+9+9))&0xFFF;
 
     while (pdptindex < num_gig)
     {
+
         PDE* pd = (PDE*)MIRROR((uint64_t)(pdpt[pdptindex]) & (~0b111111111111LL));
         pd[pdindex] = (PDE)UNMIRROR(pageTableAddress | 0b111LL);
         PTE* pt = (PTE*)pageTableAddress;
         for (i=0;i<512;i++)
         {
             pt[i] = 0;
-            address += 0x1000LL;
         }
         pageTableAddress += 0x1000LL;
         pdindex++;
@@ -222,9 +242,6 @@ uint64_t setup_process_page_structure(uint64_t num_gig, uint64_t* pml4Address, u
         }
     }
     pageTableAddress = MIRROR(*pagetableAddress);
-    
-    // mmio. TODO: we should only map specific ranges
-    add_process_mapping(0xFEC00000, 0xFEC00000, ((0xFF000000-0xFEC00000)/4096), pageTableAddress);
 
     return;
 }

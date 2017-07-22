@@ -9,7 +9,6 @@
 .global setupProcessPageStructure
 .global destroyProcessPageStructure
 .global getPTEntry
-.global markPageAsInUse
 .global kernelAllocPages
 .global kernelReleasePages
 .global mapPhysOnVirtualAddressSpace
@@ -18,7 +17,6 @@
 .global virt2phys
 .global releasePhysicalPage
 .global emulate_invpcid
-.global isMirrorPageDirty
 .global release_pages
 
 
@@ -67,6 +65,7 @@ allocatePhysicalPages:
     
     // Loop through all 4k pages. The PAGETABLE is in kernel mem. process sees same memory arrangement
     mov     $PAGETABLES,%rdx
+    btsq    $MIRROR_BIT,%rdx
     sub     $8,%rdx
     mov     $((MAX_RAM-KERNEL_RESERVED_END)/4096),%rcx
 searchFreePage:
@@ -154,6 +153,7 @@ releasePhysicalPage:
     shr         $12,%rdi                    // convert page index
     shl         $3,%rdi                     // convert to byte index
     add         $PAGETABLES,%rdi
+    btsq        $MIRROR_BIT,%rdi
 
     mov         (%rdi),%rax
     mov         %rax,%rbx
@@ -266,7 +266,7 @@ mapPhysOnVirtualAddressSpace:
     or          %r8,%rdx
 
     // PTE index = (virt-128mb)/4096
-    sub         $KERNEL_RESERVED_END,%rsi
+    sub         $THREAD_CODE_START,%rsi
     shr         $12,%rsi
 
     // PTE address = PTEIndex*8 + pageTableBase
@@ -648,29 +648,6 @@ destroyTable:
     ret
 
 
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-// Function: markPageAsInUse(rax=address, rdi=pagetable_base_address, rcx=phys_addr)
-// WARNING: NO ADRESS HIGHER THAN 4G SINCE PAGE TABLES ARE NOT BIG ENOUGH
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-markPageAsInUse:
-    push    %rbx
-
-    cmp     $0xFFFFFFF,%rax
-    ja      1f
-    sub     $KERNEL_RESERVED_END,%rax
-    shr     $12,%rax            // get Page Number
-    shl     $3,%rax             // Mul by 8 since each entry is 8byte in length
-    add     %rdi,%rax
-    mov     (%rax),%ebx
-    and     $0xFFFFF1FF,%ebx     // clear AVL
-    or      $0x00000400,%ebx     // in use by kernel
-    or      %rcx,%rbx
-    mov     %ebx,(%rax)
-1:  pop     %rbx
-    ret
-
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
@@ -707,40 +684,5 @@ calculateMemoryUsage:
     pop         %rcx
     pop         %rdi
     ret
-
-
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-// Function: isMirrorPageDirty(rdi=virtual_address) 
-// This will lookup an PTE in the mirror page tables. Those page tables
-// are common to all processes. This will return the dirty bit of the PTE
-// This will reset the dirty flag
-// Return: dirty bit is stored in carry flag
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-isMirrorPageDirty:
-    push    %rdi
-
-    btr     $MIRROR_BIT,%rdi
-
-    // the page tables start at 128mb, because before that, 
-    // the mapping is in the the PDE. The PDP is shared for all 
-    // processes, so we access the same place.
-
-    // get page entry in table: addr/4096 * 8
-    shr         $9,%rdi   
-
-    // now add PATABLES - (128meg/4096)*8
-    btr         $6,(PAGETABLES-0x40000)(%rdi)
-    mov (PAGETABLES-0x40000)(%rdi),%rax
-    pop         %rdi
-    ret
-
-
-
-
-
-
-
 
 
