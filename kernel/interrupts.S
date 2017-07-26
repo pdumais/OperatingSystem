@@ -240,7 +240,10 @@ exceptionEHandler:
     lea         8(%rsp),%rbp         
     push        %rax
     push        %rdi
+    push        %rsi
     push        %rbx
+    push        %rcx
+    push        %rdx
 
     // Check the error code pushed on the stack.
     // If the page was already present, then this is a permission error
@@ -256,8 +259,8 @@ exceptionEHandler:
     mov         %cr2,%rax
     mov         $THREAD_CODE_START,%rbx
     cmp         %rbx,%rax
-    jb          failPF   
-    mov         $STACK3TOP_VIRTUAL_ADDRESS,%rbx
+    jb          failPF   // dont allocate in kernel mem
+/*    mov         $STACK3TOP_VIRTUAL_ADDRESS,%rbx
     cmp         %rbx,%rax
     jae         failPF   
     mov         $HEAP_TOP,%rbx
@@ -268,21 +271,27 @@ exceptionEHandler:
     jae         1f
     jmp         failPF
 
-    // Get the PTE for that address
-1:  mov         %rax,%rdi
-    call        getPTEntry
-    mov         (%rax),%rbx         // rax = PTE address for faulty address
-    mov         %rax,%rbx
+1:*/
 
     // At this point, all checks are good. Allocate 1 page for that area
     mov         $1,%rdi
     call        allocateStackPage   // misleading name. Also allocates for heap
 
-    // make the mapping in the page table
-    or          $0b001000000111,%rax
-    mov         %rax,(%rbx)     
+    btr         $MIRROR_BIT,%rax
+    mov         %rax,%rdx
+    mov         %cr2,%rsi
+    mov         %cr3,%rdi
+    btr         $63,%rdi
+    and         $0xFFFFF000,%di
+    bts         $MIRROR_BIT,%rdi
+    mov         $0b110,%rcx
+    call        mapPhysicalAddressToVirtual
 
+    
+    pop         %rdx
+    pop         %rcx
     pop         %rbx
+    pop         %rsi
     pop         %rdi
     pop         %rax
     pop         %rbp
@@ -290,7 +299,10 @@ exceptionEHandler:
     iretq
 
 failPF:
+    pop         %rdx
+    pop         %rcx
     pop         %rbx
+    pop         %rsi
     pop         %rdi
     pop         %rax
     pop         %rbp

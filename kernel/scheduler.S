@@ -160,6 +160,7 @@ launchSoftIRQThread:
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 launchKernelThread:
+    push    %rdx
     push    %rdi
     push    %rsi
     call    createKernelThread
@@ -167,6 +168,7 @@ launchKernelThread:
     call    addTaskInList
     pop     %rsi
     pop     %rdi
+    pop     %rdx
     ret
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -183,20 +185,22 @@ launchKernelThread:
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 createKernelThread:
-    push    %rbx
     push    %rcx
     push    %rax
     push    %r9
     push    %r8
-    mov     %rdi,%rbx // we need it to set initial RIP in stack of thread
+    push    %r14
+    push    %r13
+    push    %rdx // we need it as it is the initial value passed to thread
+    push    %rdi // we need it to set initial RIP in stack of thread
+    
 
     // Create 2 stack pages. The function returns (in rax)
     // the physical address to the begining of the block
     // The 2nd page is used for process meta-data.
-    mov     $5,%rdi   
+    mov     $3,%rdi   
     call    allocateStackPage
-    mov     %rax,%rdi           
-    add     $0x4000,%rdi     // points to meta data page, after stack
+    mov     %rax,%r14
 
     // Create a page structure somewhere in memory
     // the function will return the base address of the PML4 
@@ -204,68 +208,76 @@ createKernelThread:
     // the PTE entries are for the process's 4k pages that
     // start after kernel memory
     call    setupProcessPageStructure
+    mov     %r8,%r13
     // At this point. 
     //      r8 = base address of the PML4
-    //      r9 = adress of first PTE entry.
-    //      The PTE entries are empty (not mapped)
 
-    // map the stack page to physical address we got earlier in rax 
-    // At this point rax=physical address of stack block that we got above.
-    push    %rdi
-    push    %rsi
-
-    mov     %rax,%rsi
-    mov     %r9,%rdi
-    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
-    add     $STACK_ADDRESS_PAGE_TABLE_OFFSET-(3*8),%rdi
-    mov     $4,%rcx
-    call    mapMemory
-
-    mov     %rax,%rsi
-    add     $0x4000,%rsi
-    mov     %r9,%rdi
-    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
-    add     $META_ADDRESS_PAGE_TABLE_OFFSET,%rdi
+    // Assign stack pages. Only the stack0 pages and 1 stack3 page
+    mov     %r14,%rdx
+    mov     $(STACK0TOP_VIRTUAL_ADDRESS-4096),%rsi
+    mov     %r13,%rdi
+    btsq    $MIRROR_BIT,%rdi
     mov     $1,%rcx
-    call    mapMemory
+    call    mapMultiplePhysicalAddressToVirtual
 
+    // Assign stack pages. Only the stack0 pages and 1 stack3 page
+    mov     %r14,%rdx
+    add     $0x1000,%rdx
+    mov     $(STACK3TOP_VIRTUAL_ADDRESS-4096),%rsi
+    mov     %r13,%rdi
+    btsq    $MIRROR_BIT,%rdi
+    mov     $1,%rcx
+    call    mapMultiplePhysicalAddressToVirtual
+
+    // Assign meta page
+    mov     %r14,%rdx
+    add     $0x2000,%rdx
+    mov     $META_VIRTUAL_ADDRESS,%rsi
+    mov     %r13,%rdi
+    btsq    $MIRROR_BIT,%rdi
+    mov     $1,%rcx
+    call    mapMultiplePhysicalAddressToVirtual
+
+    mov     %r14,%rax
+    add     $0x2000,%rax        // now rax= meta page
+    bts     $MIRROR_BIT,%rax
+    movq    $THREAD_CODE_START,(PROCESS_HEAP_ADDRESS-META_VIRTUAL_ADDRESS)(%rax)
 
     // create firt heap page
-    add     $0x4000,%rax        // now rax= meta page
-    movq    $THREAD_CODE_START,(PROCESS_HEAP_ADDRESS-META_VIRTUAL_ADDRESS)(%rax)
     mov     $1,%rdi
     call    allocateHeapPage
     push    %rax
-    mov     %rax,%rsi
-    mov     %r9,%rdi
+    mov     %rax,%rdx
+    mov     $THREAD_CODE_START,%rsi
+    mov     %r13,%rdi
     btsq    $MIRROR_BIT,%rdi
-    add     $0,%rdi    // Useless but shows that the heap starts at 0x08000000 since 
-    mov     $1,%rcx   // kernel threads are not relocated.
-    call    mapMemory
+    mov     $1,%rcx
+    call    mapMultiplePhysicalAddressToVirtual
     pop     %rdi
-    btsq    $MIRROR_BIT,%rdi
+    bts     $MIRROR_BIT,%rdi   
     call    init_heap
-    pop     %rsi
-    pop     %rdi
 
-    // So at this point, META page and first Stack page are mapped.
+    // So at this point, META page and first Stack pages are mapped.
 
     // This is the stack data for the IRETQ that will occur after the timer iterrupt
     // when the task will be scheduled
-    // rdi = end of stack (and begining of meta) that we calculated earlier
-    btsq    $MIRROR_BIT,%rdi        // set bit38 to add 256gig for identity mapping
+    mov     %r14,%rdi       // the stack0 page
+    add     $(0x1000),%rdi  // we add 4096 to go at end of page
+    btsq    $MIRROR_BIT,%rdi        
     movq    $0,-8(%rdi) /* ss */
     movq    $(STACK0TOP_VIRTUAL_ADDRESS),%rax
     movq    %rax,-16(%rdi)   /* rsp */
     movq    $0x200202,-24(%rdi)    /* rflags */ 
     movq    $0x18,-32(%rdi) /* CS */
-    movq    %rbx,-40(%rdi) /* RIP */
+    pop     %rax            // entrypoint was pushed from rdi at begining of function
+    movq    %rax,-40(%rdi) /* RIP */
 
     // This is the context data
     movq    $0xBBCCDD,-48(%rdi)    /* rax */
     movq    $0,-56(%rdi)    /* rdi */
     movq    $0,-64(%rdi)    /* rbx */
     movq    $0,-72(%rdi)    /* rcx */
+    pop     %rdx
     movq    %rdx,-80(%rdi)  /* rdx */
     movq    $0,-88(%rdi)    /* rdi */
     movq    $0,-96(%rdi)    /* rbp */
@@ -285,29 +297,16 @@ createKernelThread:
     //          Since the PLM4 address is aligned on a 4k boundary, the lowest 12bits
     //          are free to use. bit0 being the enable flag
     //      The 2nd 64bit is the RSP
-    mov     %r8,%rdi
+    mov     %r13,%rdi
 
+    pop     %r13
+    pop     %r14
     pop     %r8
     pop     %r9
     pop     %rax
     pop     %rcx
-    pop     %rbx
     ret
 
-
-
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-// Function: mapMemory(rdi=pagetableentry, rsi=phys_address, rcx=numpage
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-mapMemory:
-    or      $0b001000000111,%rsi
-1:  mov     %rsi,(%rdi)
-    add     $8,%rdi
-    add     $0x1000, %rsi
-    loop    1b     
-    ret
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////

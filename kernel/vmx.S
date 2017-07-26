@@ -8,7 +8,7 @@
 
 .global init_hypervisor
 .global create_vm
-
+.global new_vcpu_thread
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
@@ -217,7 +217,6 @@ create_vm:
 
     // Save the vCPU count in rcx so we can loop later
     mov         %rdi,%rcx
-
     // Create the VMINFO structure
     call        reserve_vminfo
     cmp         $0,%rax

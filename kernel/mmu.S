@@ -11,7 +11,6 @@
 .global getPTEntry
 .global kernelAllocPages
 .global kernelReleasePages
-.global mapPhysOnVirtualAddressSpace
 .global calculateMemoryUsage
 .global currentProcessVirt2phys
 .global virt2phys
@@ -238,92 +237,6 @@ allocateHeapPage:
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-// mapPhysOnVirtualAddressSpace(rdi=pageTableBase,rsi=virtualAddress,
-//                              rdx=physical_address, rcx=page_count, 
-//                              r8=permission_flag
-//
-// permission_flag:
-//      bit63: no execute flag (1= no execute)
-//      bit2: non-priviledged (0=supervisor only)
-//      bit1: writable flag (1=R/W)
-//
-// NOTES: Physical pages must be contiguous
-//        Virtual pages must be contiguous
-//        pageTableBase is the address of the PT for 4k pages at the 128mb mark
-//          since below 128mb, we are using 2mb pages (Page Directory Entries)
-//          For this reason, the virtual address must be above the 128mb mark
-//
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-mapPhysOnVirtualAddressSpace:
-    push        %rdi
-    push        %rsi
-    push        %rcx
-    push        %rdx
-
-    // create PTE out of physical address
-    or          $0b001000000001,%rdx
-    or          %r8,%rdx
-
-    // PTE index = (virt-128mb)/4096
-    sub         $THREAD_CODE_START,%rsi
-    shr         $12,%rsi
-
-    // PTE address = PTEIndex*8 + pageTableBase
-    lea         (%rdi,%rsi,8),%rdi
-
-    // now store the PTEs in the page table
-1:  mov         %rdx,(%rdi)
-    add         $8,%rdi
-    add         $0x1000,%rdx
-    loop        1b    
-
-    pop         %rdx
-    pop         %rcx
-    pop         %rsi
-    pop         %rdi
-    ret
-
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-//  reservePhysicalMemoryForVirtualRange(rdi=virtual_address, rsi=pageCount)
-//  Warning: this is not multi-thread friendly. It will change page entries but
-//  assumes that the caller is the owner of those pages.
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-reservePhysicalMemoryForVirtualRange:
-    push        %rdi
-    push        %rax
-    push        %rcx
-    push        %rdx
-    push        %rbx
-
-    mov         %rsi,%rcx
-1:  push        %rdi
-    mov         $1,%rdi
-    call        allocateHeapPage        // rdi= number of pages
-    mov         %rax,%rbx
-
-    
-    pop         %rdi
-    call        getPTEntry
-    mov         (%rax),%rdi
-    and         $0xFFF,%rdi
-    or          %rbx,%rdi
-    mov         %rdi,(%rax)
-    add         $0x1000,%rdx
-    loop        1b  
-
-    pop         %rbx
-    pop         %rdx
-    pop         %rcx
-    pop         %rax
-    pop         %rdi
-    ret
-
-
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
 // Function: currentProcessVirt2phys(rdi=virtual_address)
 //   RETURN %rax= physical address in mirror addressing space
 //                will return 0 if page not present
@@ -434,69 +347,6 @@ pageDoesNotExist2:
     ret
     
 
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-// Function: getPTEntry(%rdi=virtual_address)
-//   RETURN %rax= address of PTE for that address. Address will be in 
-//          a identity address residing over the 256th gig.
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-getPTEntry:
-    push        %rbx
-
-    // In virtual address:
-    // 47:39 - PML4 entry index 
-    // 38:30 - PDP  entry index
-    // 29:21 - PD entry index
-    // 20:12 - PT entry index
-
-    mov         %cr3,%rax
-    CLEANCR3ADDRESS(%rax)
-    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
-    //rax=PML4 address
-
-    // get PML4 offset from virtual address
-    mov         %rdi,%rbx
-    shr         $(39-3),%rbx
-    and         $0xFF8,%rbx  
-    add         %rbx,%rax
-    mov         (%rax),%rax
-    shr         $12,%rax
-    shl         $12,%rax
-    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
-    // rax = PDP table address
-
-    // get PDP offset from virtual address
-    mov         %rdi,%rbx
-    shr         $(30-3),%rbx
-    and         $0xFF8,%rbx  
-    add         %rbx,%rax
-    mov         (%rax),%rax
-    shr         $12,%rax
-    shl         $12,%rax
-    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
-    // rax = PD table address
-
-    // get PD offset from virtual address
-    mov         %rdi,%rbx
-    shr         $(21-3),%rbx
-    and         $0xFF8,%rbx
-    add         %rbx,%rax
-    mov         (%rax),%rax
-    shr         $12,%rax
-    shl         $12,%rax
-    btsq        $MIRROR_BIT,%rax        // set bit38 to add 256gig for identity mapping
-    // rax = PT table address
-    
-    // get PT offset from virtual address
-    mov         %rdi,%rbx
-    shr         $(12-3),%rbx
-    and         $0xFF8,%rbx
-    add         %rbx,%rax
-    // rax = PT entry address
-
-    pop         %rbx
-    ret
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////

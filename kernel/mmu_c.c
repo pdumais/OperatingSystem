@@ -4,6 +4,9 @@
 #include "printf.h"
 #include "utils.h"
 
+#define MIRRORAREA(x) (((uint64_t)x)|(1LL<<MIRROR_BIT))
+#define ISMIRROR_ADDRESS(x) (x>=(1LL<<MIRROR_BIT))
+
 typedef uint64_t PML4E;
 typedef uint64_t PDPTE;
 typedef uint64_t PDE;
@@ -18,6 +21,8 @@ typedef struct
 } mem_map_entry;
 
 extern void* kernelAllocPages(uint64_t pageCount);
+extern uint64_t allocateStackPage(uint64_t pageCount);
+
 
 bool is_page_reserved(uint64_t address)
 {
@@ -244,4 +249,56 @@ uint64_t setup_process_page_structure(uint64_t num_gig, uint64_t* pml4Address, u
     pageTableAddress = MIRROR(*pagetableAddress);
 
     return;
+}
+
+
+bool mapPhysicalAddressToVirtual(PML4E* pml4, uint64_t virt, uint64_t phys, uint64_t mask)
+{
+    uint64_t pml4index = (virt>>(12+9+9+9))&0x1FF;
+    uint64_t pdptindex = (virt>>(12+9+9))&0x1FF;
+    uint64_t pdindex = (virt>>(12+9))&0x1FF;
+    uint64_t ptindex = (virt>>(12))&0x1FF;
+
+    PML4E pml4e = pml4[pml4index];
+    if (pml4e == 0) 
+    {
+        pml4e = UNMIRROR(kernelAllocPages(1));   
+        pml4[pml4index] = pml4e | 0b111;
+    }
+    PDPTE* pdpt = MIRRORAREA(((uint64_t)pml4e & 0x00FFFFFFFFFFF000LL));
+    PDPTE pdpte = pdpt[pdptindex];
+    if (pdpte == 0)
+    {
+        pdpte = UNMIRROR(kernelAllocPages(1));   
+        pdpt[pdptindex] = pdpte | 0b111;
+    }
+    PDE* pd = MIRRORAREA(((uint64_t)pdpte & 0x00FFFFFFFFFFF000LL));
+    PDE pde = pd[pdindex];
+    if (pde == 0)
+    {
+        pde = UNMIRROR(kernelAllocPages(1));   
+        pd[pdindex] = pde | 0b111;
+    }
+    PTE* pt = MIRRORAREA(((uint64_t)pde & 0x00FFFFFFFFFFF000LL));
+    PTE* pte = MIRRORAREA((uint64_t)&pt[ptindex]);
+    
+    phys = phys | mask | (1LL<<9) | (1LL<<0);
+    *pte = phys; 
+    return true;
+}
+
+bool mapMultiplePhysicalAddressToVirtualWithMask(PML4E* pml4, uint64_t virt, uint64_t phys, uint64_t pageCount, uint64_t mask)
+{
+    while (pageCount)
+    {
+        mapPhysicalAddressToVirtual(pml4, virt, phys, mask);
+        virt+=0x1000;
+        phys+=0x1000;
+        pageCount--;
+    }
+}
+
+bool mapMultiplePhysicalAddressToVirtual(PML4E* pml4, uint64_t virt, uint64_t phys, uint64_t pageCount)
+{
+    mapMultiplePhysicalAddressToVirtualWithMask(pml4,virt,phys,pageCount,0b110);
 }

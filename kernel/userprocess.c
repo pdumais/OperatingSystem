@@ -13,7 +13,7 @@ extern void* allocateStackPage(uint64_t pageCount);
 extern void* allocateHeapPage(uint64_t pageCount);
 extern void setupProcessPageStructureForUserProcess(struct ProcessCreationInfo*);
 extern void destroyProcessPageStructure(uint64_t pml4_address);
-extern void mapPhysOnVirtualAddressSpace(uint64_t pageTableBase, uint64_t virtualAddress, uint64_t physicalAddress, uint64_t pageCount, uint64_t mask);
+extern bool mapMultiplePhysicalAddressToVirtualWithMask(uint64_t pml4, uint64_t virt, uint64_t phys, uint64_t pageCount, uint64_t mask);
 extern void createProcessStub(char* codeArea, char* entryPoint);
 extern void memcpy64(char* source, char* destination, uint64_t size);
 extern void memclear64(char* destination, uint64_t size);
@@ -58,9 +58,9 @@ void createUserProcess(struct UserProcessInfo* upi)
     upi->lastProgramAddress = 0;
 
     // Create the virtual mapping
-    mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,STACK0TOP_VIRTUAL_ADDRESS-(0x1000*4),(uint64_t)stack0Pages,4,(1LL<<63)|(0<<2)|(1<<1));
-    mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,META_VIRTUAL_ADDRESS,(uint64_t)metaPage,1,(1LL<<63)|(1<<2)|(1<<1));
-    mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,STACK3TOP_VIRTUAL_ADDRESS-(0x1000*4),(uint64_t)stack3Pages,4,(1LL<<63)|(1<<2)|(1<<1));
+    mapMultiplePhysicalAddressToVirtualWithMask(MIRRORAREA(upi->psi.pml4),STACK0TOP_VIRTUAL_ADDRESS-(0x1000*4),(uint64_t)stack0Pages,4,(1LL<<63)|(0<<2)|(1<<1));
+    mapMultiplePhysicalAddressToVirtualWithMask(MIRRORAREA(upi->psi.pml4),META_VIRTUAL_ADDRESS,(uint64_t)metaPage,1,(1LL<<63)|(1<<2)|(1<<1));
+    mapMultiplePhysicalAddressToVirtualWithMask(MIRRORAREA(upi->psi.pml4),STACK3TOP_VIRTUAL_ADDRESS-(0x1000*4),(uint64_t)stack3Pages,4,(1LL<<63)|(1<<2)|(1<<1));
 
 
     // Prepare stack
@@ -96,7 +96,7 @@ void createProcessHeap(struct UserProcessInfo* upi)
 {
     char* pages = (char*)allocateHeapPage(1);
     uint64_t virtualAddress = (upi->lastProgramAddress+0xFFF)&~0xFFF;
-    mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,virtualAddress,(uint64_t)pages,1, (1LL<<63)|(1<<2)|(1<<1));
+    mapMultiplePhysicalAddressToVirtualWithMask(MIRRORAREA(upi->psi.pml4),virtualAddress,(uint64_t)pages,1, (1LL<<63)|(1<<2)|(1<<1));
     init_heap(MIRRORAREA(pages));
     *((uint64_t*)&upi->metaPage[PROCESS_HEAP_ADDRESS-META_VIRTUAL_ADDRESS]) = virtualAddress;
 }
@@ -115,7 +115,7 @@ void addUserProcessSection(struct UserProcessInfo* upi, char* buffer, uint64_t v
     if (!execute) mask |= (1LL<<63);
     uint64_t pageCount = (size+0xFFF)>>12; 
     char* pages = (char*)allocateHeapPage(pageCount);
-    mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,virtualAddress,(uint64_t)pages,pageCount, mask);
+    mapMultiplePhysicalAddressToVirtualWithMask(MIRRORAREA(upi->psi.pml4),virtualAddress,(uint64_t)pages,pageCount, mask);
     pages = (char*)MIRRORAREA(pages);
     if (initZero)
     {
@@ -136,7 +136,7 @@ void setUserProcessCodeSection(struct UserProcessInfo* upi, char* buffer, uint64
     uint64_t mask = (1LL<<2); // execute, readonly, U/S
     uint64_t pageCount = ((size+USER_PROCESS_STUB_SIZE)+0xFFF)>>12; 
     char* pages = (char*)allocateHeapPage(pageCount);
-    mapPhysOnVirtualAddressSpace((uint64_t)upi->psi.pageTables,virtualAddress-USER_PROCESS_STUB_SIZE,(uint64_t)pages,pageCount,mask);
+    mapMultiplePhysicalAddressToVirtualWithMask(MIRRORAREA(upi->psi.pml4),virtualAddress-USER_PROCESS_STUB_SIZE,(uint64_t)pages,pageCount,mask);
     pages = (char*)MIRRORAREA(pages);
     memcpy64(buffer,(char*)&pages[USER_PROCESS_STUB_SIZE],size);
     createProcessStub(pages, upi->entryPoint);       
