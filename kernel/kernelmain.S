@@ -37,6 +37,14 @@ startKernelThread:
     mov     $(mainkernelthread_end-mainkernelthread),%rsi
     call    launchKernelThread
 
+/*    mov     $testthread,%rdi
+    mov     $(testthread_end-testthread),%rsi
+    call    launchKernelThread
+
+    mov     $testthread,%rdi
+    mov     $(testthread_end-testthread),%rsi
+    call    launchKernelThread  */
+
     ret
 
 
@@ -108,4 +116,19 @@ blockbuffer:
 mainkernelthread_end:
 
 
+testthread:
+    sub     $32,%rsp
+    rdrand  %rax
+    movd     %rax,%xmm1
+1:
+    movd    %xmm1,%rbx
+    cmp     %rbx,%rax
+    je      1b
+//    int     $3
+    jmp     1b
 
+testdata:.quad 0
+         .quad 0
+testdata2:.quad 0
+         .quad 0
+testthread_end:

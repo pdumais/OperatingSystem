@@ -55,9 +55,13 @@ int main(uint64_t param)
     uint64_t cmdIndex = 0;
     char ch;
     
+    //TODO: this is just a test
+    uint64_t* test,test2;
+
     printf("shell> \003");
     while (quit == 0)
     {
+        //TODO: this is just a test
         ch = poll_in();
 
         if ((ch>='0' && ch<='9')||(ch>='a' && ch<='z')||(ch>='A' && ch<='Z')||(ch==' ')||(ch=='.')) 

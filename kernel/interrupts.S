@@ -344,7 +344,9 @@ int6Handler:
 ////////////////////////////////////////////////////////////////////////////////////
 .align 16
 deviceNotAvailableHandler:
-    push    %rdx
+    //Will need to rewrite this, this algorithm is not smp-safe
+    jmp     crashDump
+/*    push    %rdx
     push    %rax
     push    %rbx
     push    %rcx
@@ -379,7 +381,8 @@ deviceNotAvailableHandler:
 noLastContext:
     mov     %rcx,lastMediaSaveArea // indicate that this thread is the last one that executed a media instruction
     xrstor  (%rcx)
-
+mov $0xBEBECACA,%rax
+int $3
 sameContext:
     pop     %rdi
     pop     %rcx
@@ -387,7 +390,7 @@ sameContext:
     pop     %rax
     pop     %rdx
     iretq
-lastMediaSaveArea: .QUAD 0
+lastMediaSaveArea: .QUAD 0*/
 
 
 ////////////////////////////////////////////////////////////////////////////////////

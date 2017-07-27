@@ -1,4 +1,3 @@
-.global getPageDescriptorAddress
 .global memcpy64
 .global memclear64
 .global checksum_1complement
@@ -40,18 +39,6 @@ yield:
 cant_yield:
     // Interrupts are cleared!!!
     int     $3
-
-/*
-    returns address of page directory entry associated with virtual address passed in %rdi
-*/
-getPageDescriptorAddress:
-    mov     %rdi,%rax
-    sub     $THREAD_CODE_START,%rax 
-    shr     $12,%rax    /* divide by 4k, then mul by 8bytes per entry = >>12, <<3 */ 
-    shl     $3,%rax    /* divide by 4k, then mul by 8bytes per entry = >>12, <<3 */ 
-    add     $PAGETABLES,%rax
-    btsq    $MIRROR_BIT,%rax
-    ret
 
 
 // rdi = source, rsi = destination, rdx = size
