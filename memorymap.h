@@ -25,7 +25,8 @@
 #define PML4TABLE       0x00008000      // needs to be 4k aligned. we only use 1 entry
 #define PDPTTABLE       0x00009000      // only 1 table is needed (512 gig) 
 #define RESERVED5       0x0000A000
-#define RESERVED5END    0x000FFFFF
+#define RESERVED5END    0x0000DFFF
+#define TMP_PAGE_TABLES 0x0000E000
 #define PRDT1           0x00010000
 #define PRDT2           0x00010010
 #define TASKLIST_BASE   0x00020000

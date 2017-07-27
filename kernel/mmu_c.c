@@ -64,7 +64,7 @@ void setup_kernel_page_structure(uint64_t num_gig)
     // Create pml4 entry for first 512gig
     pml4[0] = PDPTTABLE | 0b111LL;
     // Create pml4 entry for mirror space (bit 47, so starting at gig 256) 
-    pml4[256] = PDPTTABLE | 0b111LL;
+    pml4[128] = PDPTTABLE | 0b111LL;
 
     // For each gig that we support, create a PD 
     i = 0;

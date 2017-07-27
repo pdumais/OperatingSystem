@@ -74,10 +74,8 @@ enableLongMode:
     push    %eax
     push    %ecx
 
-    
-
     // set PML4 address
-    mov     $PML4TABLE,%eax
+    mov     $TMP_PAGE_TABLES,%eax
     mov     %eax,%cr3
 
     // Enable PAE and PCID
@@ -155,7 +153,6 @@ ltrlock: .quad 0
 enableAVX:
     mov     %cr0,%rax
     or      $0b10,%rax
-//    and     $0xFFFFFFFFFFFFFFFD,%rax
     mov     %rax,%cr0
 
     mov     %cr4,%rax
@@ -170,6 +167,10 @@ enableAVX:
 
 .align 16
 longmodeAP:
+    mov     $PML4TABLE,%rax
+    bts     $63,%rax                    // flush TLB
+    mov     %rax,%cr3
+
     call    prepareGDTAndTSS
     call    initSMPForAP
 
@@ -192,8 +193,10 @@ longmodeAP:
 longmode:
     mov     $RAM_COUNT_GIG,%rdi
     call    setup_kernel_page_structure
-    //TODO: should clear TLB
 
+    mov     $PML4TABLE,%rax
+    bts     $63,%rax                    // flush TLB
+    mov     %rax,%cr3
 
     call    prepareGDTAndTSS
     call    setupIDT
@@ -301,55 +304,44 @@ GDTDATA_END:
 */                                                                                    
 .code32                                                                               
 setupPageStructure:                                                                   
+    push    %edx                                                                      
     push    %eax                                                                      
     push    %ebx                                                                      
     push    %edi                                                                      
     push    %ecx                                                                      
                                                                                       
     // create 1 PML4 entry (because it is good for 512gig)                            
-    mov     $PML4TABLE,%edi                                                           
+    mov     $TMP_PAGE_TABLES,%edi                                                           
     mov     $1024,%ecx          /*clear the table first*/                             
     xor     %eax,%eax                                                                 
     rep     stosl                                                                     
-    mov     $PML4TABLE,%edi                                                           
-    mov     $PDPTTABLE,%eax /* This address is aligned on 4kboundary. So bit0-11 are cleared*/
+    mov     $TMP_PAGE_TABLES,%edi                                                           
+    mov     $(TMP_PAGE_TABLES+0x1000),%eax /* This address is aligned on 4kboundary. So bit0-11 are cleared*/
     or      $0b000000000111,%eax /* present, r/w, user/supervisor access, no pwt nor pcd*/
     xor     %ebx,%ebx       /* upper 32bit of PML4 entry. address=0 because below 4G. NX=0*/
     mov     %eax,(%edi)                                                               
     mov     %ebx,4(%edi)                                                              
-    mov     %eax,(8*128)(%edi)   // same entry for #256 for mirror                    
+    mov     %eax,(8*128)(%edi)   // same entry for for mirror                    
                                                                                       
-    // Create the PDPT with 4 entries. Each entry describres 1 gig                    
-    mov     $PDPTTABLE,%edi                                                           
-    mov     $1024,%ecx          /*clear the table first*/                             
-    xor     %eax,%eax                                                                 
-    rep     stosl                                                                     
-    mov     $PDPTTABLE,%edi                                                           
-    mov     $PDTABLE,%eax /* This address is aligned on 4kboundary. So bit0-11 are cleared*/
-    or      $0b000000000111,%eax /* present, r/w, user/supervisor access, no pwt nor pcd*/
-    xor     %ebx,%ebx       /* upper 32bit of PML4 entry. address=0 because below 4G. NX=0*/
-    mov     $4,%ecx         /* we need 4 of those entries that can address 1g each */  
+    // Create the PDPT with 512 entries. Each entry describres 1 gig                    
+    mov     $(TMP_PAGE_TABLES+0x1000),%edi                                                           
+    mov     $0,%edx 
+    mov     $512,%ecx         /* we need 4 of those entries that can address 1g each */  
 createPDPTEntry:                                                                      
+    mov     %edx,%eax
+    mov     %edx,%ebx
+    shl     $30,%eax
+    shr     $2,%ebx
+    mov     $0b000010000111,%eax /* present, r/w, user/supervisor access, no pwt nor pcd*/
     mov     %eax,(%edi)                                                               
     mov     %ebx,4(%edi)                                                              
     add     $8,%edi                                                                   
-    add     $0x1000,%eax        /* next PD table is 4k further */                     
+    inc     %edx
     loop    createPDPTEntry                                                           
-                                                                                      
-    // 2mb PDEs. The first 128mb are 2mb pages reserved for kernel                    
-    // 64 first entries in the first Page Directory point to 1st 128mb                
-    mov     $PDTABLE,%edi                                                             
-    xor     %ebx,%ebx           /*We will not have any page that will address over 4gig. so it is all zeros here*/
-    mov     $0b0010010000111,%eax           /*Start at address 0. present, rw, US, in use by kernel */
-    mov     $(KERNEL_RESERVED_END/(2*1024*1024)),%ecx   // kernel space is in 2mb page    
-1:  mov     %eax,(%edi)                                                               
-    mov     %ebx,4(%edi)                                                              
-    add     $8,%edi                                                                   
-    add     $0x200000,%eax        /* next page start 2mb further */                   
-    loop    1b                                                                        
                                                                                       
     pop     %ecx                                                                      
     pop     %edi                                                                      
     pop     %ebx                                                                      
     pop     %eax                                                                      
+    pop     %edx                                                                      
     ret                                                                                                             

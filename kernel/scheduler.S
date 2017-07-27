@@ -776,6 +776,22 @@ schedulerHandler:
     ////////////////////////////////////////////////
     // Save and load Context
     ////////////////////////////////////////////////
+
+    // Must store AVX state if dirty
+    mov         %cr0,%r8
+    bt          $3,%r8
+    jc          no_avx_save                 // no need to save if TS is set
+    push        %rdi
+    push        %rdx
+    mov         $AVX_SAVE_AREA,%rdi
+    mov         $0b110,%rax                 // implicitely used by xsave/xrestor
+    mov         $0,%rdx                     // implicitely used by xsave/xrestor
+    xsave       (%rdi)
+    pop         %rdx
+    pop         %rdi
+
+no_avx_save:
+
     mov         %rsp,8(%r15)                // rsp is now saved, so dont use it anymore
     mov         (%rdi),%r8                  // PML4
     mov         8(%rdi),%rsp                // rsp value when task switch occured

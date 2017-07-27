@@ -37,13 +37,13 @@ startKernelThread:
     mov     $(mainkernelthread_end-mainkernelthread),%rsi
     call    launchKernelThread
 
-/*    mov     $testthread,%rdi
+    mov     $testthread,%rdi
     mov     $(testthread_end-testthread),%rsi
     call    launchKernelThread
 
     mov     $testthread,%rdi
     mov     $(testthread_end-testthread),%rsi
-    call    launchKernelThread  */
+    call    launchKernelThread  
 
     ret
 
@@ -124,7 +124,7 @@ testthread:
     movd    %xmm1,%rbx
     cmp     %rbx,%rax
     je      1b
-//    int     $3
+    int     $3
     jmp     1b
 
 testdata:.quad 0

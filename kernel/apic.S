@@ -92,7 +92,6 @@ initSMPForBST:
     mov     $(IPI_LAST_VECTOR-IPI_FIRST_VECTOR+1)*16,%rcx
     xor     %rax,%rax
     rep     stosb
-
     // clear the IOAPIC irq handlers
     mov     $IOAPICHANDLERS,%rdi
     xor     %rax,%rax

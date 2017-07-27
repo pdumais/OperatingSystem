@@ -344,53 +344,23 @@ int6Handler:
 ////////////////////////////////////////////////////////////////////////////////////
 .align 16
 deviceNotAvailableHandler:
-    //Will need to rewrite this, this algorithm is not smp-safe
-    jmp     crashDump
-/*    push    %rdx
+    push    %rdx
     push    %rax
-    push    %rbx
-    push    %rcx
     push    %rdi
 
     // clear the TS flag
     clts
-    //mov     %cr0,%rax
-    //and     $0xFFFFFFFFFFFFFFF7,%rax
-    //mov     %rax,%cr0
-
-    // get previous save ares
-    mov     lastMediaSaveArea,%rbx
-
-    // get physical address of current SAVE_AREA    
     mov     $AVX_SAVE_AREA,%rdi
-    call    getPageDescriptorAddress
-    mov     (%rax),%rcx
-    and     $0xFFFFFFFFFFFFF000,%rcx
-
-    // is it the same context again?
-    cmp     %rbx,%rcx
-    je      sameContext
     
     mov     $0b110,%rax //implicitely used by xsave/xrestor
     mov     $0,%rdx //implicitely used by xsave/xrestor
 
-    cmp     $0,%rbx
-    jz      noLastContext // this is the first time we run, so don't save last context
-    
-    xsave   (%rbx)   // save into the last save area, which is the thread that executed the last media instruction
-noLastContext:
-    mov     %rcx,lastMediaSaveArea // indicate that this thread is the last one that executed a media instruction
-    xrstor  (%rcx)
-mov $0xBEBECACA,%rax
-int $3
-sameContext:
+    xrstor  (%rdi)
+
     pop     %rdi
-    pop     %rcx
-    pop     %rbx
     pop     %rax
     pop     %rdx
     iretq
-lastMediaSaveArea: .QUAD 0*/
 
 
 ////////////////////////////////////////////////////////////////////////////////////
