@@ -23,6 +23,7 @@ typedef struct
 extern void* kernelAllocPages(uint64_t pageCount);
 extern uint64_t allocateStackPage(uint64_t pageCount);
 
+uint64_t ram_end;
 
 bool is_page_reserved(uint64_t address)
 {
@@ -52,11 +53,26 @@ void show_memory_map()
     }
 }
 
-void setup_kernel_page_structure(uint64_t num_gig)
+void set_ram_end()
+{
+    ram_end = 0;
+    mem_map_entry* m = (mem_map_entry*)MEMMAP;
+    while (m->size != 0)
+    {
+        uint64_t end = m->address + m->size;
+        if (m->type == 1)
+        {
+            if (ram_end < end) ram_end = end;
+        }
+        m++;
+    }
+}
+
+
+void setup_kernel_page_structure()
 {
     uint64_t i,n;
-    
-    if (num_gig >= 512) return 0;
+    uint64_t num_gig = (ram_end /(1024*1024*1024));
 
     PML4E* pml4 = (PML4E*)PML4TABLE;
     PDPTE* pdpt = (PDPTE*)PDPTTABLE;
@@ -72,7 +88,6 @@ void setup_kernel_page_structure(uint64_t num_gig)
     n = num_gig;
     while (n)
     {
-        
         PDE* pd = (PDE*)firstPDAddress;
         pdpt[i] = (uint64_t)pd | 0b111LL;
 
@@ -85,7 +100,7 @@ void setup_kernel_page_structure(uint64_t num_gig)
     // create the 2mb mappings of kernel area 
     // Kernel wants the entire section including page tables
     // these are defined until KERNERL_RESERVED_END
-    n = (KERNEL_RESERVED_END/(2*1024*1024));
+    n = (KERNEL_END/(2*1024*1024));
     uint64_t pdptindex = 0;
     uint64_t pdindex = 0;
     uint64_t virtual_address = 0;
@@ -112,8 +127,9 @@ void setup_kernel_page_structure(uint64_t num_gig)
     // wont run anymore after processes are started so this pml4 will not
     // be used. We could simply use a bitmap to track free pages.
     // but these tables are referenced by all processes for the mirror space
-    virtual_address = KERNEL_RESERVED_END;
+    virtual_address = KERNEL_END;
     uint64_t pageTableAddress = PAGETABLES;
+    uint64_t pageTableEnd = PAGETABLES + (((ram_end-KERNEL_END)/4096)*8);
     while (pdptindex < num_gig)
     {
         PDE* pd = (PDE*)((uint64_t)(pdpt[pdptindex]) & (~0b111111111111LL));
@@ -128,6 +144,11 @@ void setup_kernel_page_structure(uint64_t num_gig)
             // for a process
             uint64_t avl = 0;
             if (is_page_reserved(virtual_address))
+            {   
+                avl = (0b100 << 9);
+            }
+
+            if (virtual_address < pageTableEnd)
             {   
                 avl = (0b100 << 9);
             }
@@ -152,28 +173,9 @@ void setup_kernel_page_structure(uint64_t num_gig)
         }
     }
 
+
 }
 
-
-///////////////////////////////////////////////////////////////////////////////////////
-// NOTE:    This mapping function is only used during page structure creation
-//          It should not be used for assigning pages to live processes since
-//          it doesn't have any locking mechanism. If such a function is needed,
-//          look at mapPhysOnVirtualAddressSpace in mmu.S
-//
-///////////////////////////////////////////////////////////////////////////////////////
-/*void add_process_mapping(uint64_t virt, uint64_t phys, uint64_t pageCount, uint64_t pagetableAddress)
-{
-    pagetableAddress += ((virt - THREAD_CODE_START)/4096)*8;
-    while (pageCount)
-    {
-        PTE* pte = (PTE*)pagetableAddress;
-        *pte = phys | 0b111;
-        pagetableAddress+=8;
-        phys+=0x1000;    
-        pageCount--;
-    }
-}*/
 
 uint64_t setup_process_page_structure(uint64_t num_gig, uint64_t* pml4Address, uint64_t* pagetableAddress)
 {

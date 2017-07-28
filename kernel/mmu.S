@@ -153,10 +153,6 @@ releasePhysicalPage:
     // find its index in PAGETABLES
     sub         $KERNEL_END,%rdi
 
-// Intentional crashing here because I changed this before I made the change
-// to page tables. They are currently included in the 2mb space
-// but once they are excluded from the 2mb space, this algorithm will work
-int $3
     shr         $12,%rdi                    // convert page index
     shl         $3,%rdi                     // convert to byte index
     add         $PAGETABLES,%rdi

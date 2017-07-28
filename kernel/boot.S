@@ -191,7 +191,7 @@ longmodeAP:
 
 .align 16
 longmode:
-    mov     $RAM_COUNT_GIG,%rdi
+    call    set_ram_end
     call    setup_kernel_page_structure
 
     mov     $PML4TABLE,%rax
@@ -201,6 +201,7 @@ longmode:
     call    prepareGDTAndTSS
     call    setupIDT
     call    loadIDT
+
     call    enableAVX
     call    initScheduler
 

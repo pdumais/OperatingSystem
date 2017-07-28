@@ -56,7 +56,6 @@
 ////////////////////////////////////////////////////
 ////////////////////////////////////////////////////
 #define THREAD_CODE_START 0x02000000
-//#define THREAD_CODE_START (KERNEL_RESERVED_END)
 #define META_VIRTUAL_ADDRESS         ((MAX_RAM)-0x2000000) 
 #define STACK0TOP_VIRTUAL_ADDRESS    (META_VIRTUAL_ADDRESS) //this can't be more than 4pages since ring3 stack top is 16k below it
 #define STACK3TOP_VIRTUAL_ADDRESS    (STACK0TOP_VIRTUAL_ADDRESS-0x4000) 
