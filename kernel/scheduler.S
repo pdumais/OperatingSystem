@@ -202,13 +202,8 @@ createKernelThread:
     call    allocateStackPage
     mov     %rax,%r14
 
-    // Create a page structure somewhere in memory
-    // the function will return the base address of the PML4 
-    // and the address of the first 4k PTE.
-    // the PTE entries are for the process's 4k pages that
-    // start after kernel memory
     call    setupProcessPageStructure
-    mov     %r8,%r13
+    mov     %rax,%r13
     // At this point. 
     //      r8 = base address of the PML4
 

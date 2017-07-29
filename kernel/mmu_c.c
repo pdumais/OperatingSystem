@@ -177,30 +177,18 @@ void setup_kernel_page_structure()
 }
 
 
-uint64_t setup_process_page_structure(uint64_t num_gig, uint64_t* pml4Address, uint64_t* pagetableAddress)
+uint64_t setup_process_page_structure()
 {
     uint64_t n,i;
-    if (num_gig >= 512)
-    {
-        *pml4Address = 0;
-        *pagetableAddress = 0;
-        return;
-    }
+    uint64_t num_gig = ram_end>>30;
 
     PML4E* pml4 = (PML4E*)kernelAllocPages(1);    
     PDPTE* pdpt = (PDPTE*)kernelAllocPages(1);    
-    *pml4Address = (uint64_t*)UNMIRROR(pml4);
      
     pml4[0] = UNMIRROR(pdpt) | 0b111;
     pml4[128] = PDPTTABLE | 0b111;      // mirror space
     
-    // create PD entries
-    for (n=0;n<num_gig;n++)
-    {
-        // Add an entry in PDPT
-        uint64_t a = kernelAllocPages(1);
-        pdpt[n] = UNMIRROR(a) | 0b111;
-    }
+    pdpt[0] = UNMIRROR(kernelAllocPages(1)) | 0b111;
 
     // Create 2meg entries for kernel mapping
     n = (KERNEL_END/(2*1024*1024));
@@ -221,36 +209,7 @@ uint64_t setup_process_page_structure(uint64_t num_gig, uint64_t* pml4Address, u
         }
     } 
 
-    // Now do the 4k mapping of the rest of memory that is available from THREAD_CODE_START
-    address = THREAD_CODE_START;
-    uint64_t pageTablesCount = ((num_gig*1024*1024*1024) - (THREAD_CODE_START))/(2*1024*1024);
-    uint64_t pageTableAddress = kernelAllocPages(pageTablesCount);
-    *pagetableAddress = UNMIRROR(pageTableAddress);
-
-    pdindex = (address>>(12+9))&0xFFF;
-    pdptindex = (address>>(12+9+9))&0xFFF;
-
-    while (pdptindex < num_gig)
-    {
-
-        PDE* pd = (PDE*)MIRROR((uint64_t)(pdpt[pdptindex]) & (~0b111111111111LL));
-        pd[pdindex] = (PDE)UNMIRROR(pageTableAddress | 0b111LL);
-        PTE* pt = (PTE*)pageTableAddress;
-        for (i=0;i<512;i++)
-        {
-            pt[i] = 0;
-        }
-        pageTableAddress += 0x1000LL;
-        pdindex++;
-        if (pdindex >= 512)
-        {
-            pdindex = 0;
-            pdptindex++;
-        }
-    }
-    pageTableAddress = MIRROR(*pagetableAddress);
-
-    return;
+    return (uint64_t)UNMIRROR(pml4);
 }
 
 

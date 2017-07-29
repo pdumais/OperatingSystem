@@ -11,7 +11,7 @@
 extern void* virt2phys(void* address, uint64_t pml4);
 extern void* allocateStackPage(uint64_t pageCount);
 extern void* allocateHeapPage(uint64_t pageCount);
-extern void setupProcessPageStructureForUserProcess(struct ProcessCreationInfo*);
+extern uint64_t setupProcessPageStructureForUserProcess();
 extern void destroyProcessPageStructure(uint64_t pml4_address);
 extern bool mapMultiplePhysicalAddressToVirtualWithMask(uint64_t pml4, uint64_t virt, uint64_t phys, uint64_t pageCount, uint64_t mask);
 extern void createProcessStub(char* codeArea, char* entryPoint);
@@ -22,6 +22,8 @@ extern uint64_t cleanOneDeadTask();
 extern uint64_t calculateMemoryUsage();
 extern void releasePhysicalPage(uint64_t physicalAddress);
 extern void init_heap(uint64_t physicalAddressOfHeap);
+extern uint64_t ram_end;
+
 
 void setUserProcessCodeSection(struct UserProcessInfo* upi, char* buffer, uint64_t virtualAddress, uint64_t size);
 
@@ -53,8 +55,7 @@ void createUserProcess(struct UserProcessInfo* upi)
     *((uint64_t*)&upi->metaPage[FILE_HANDLE_ADDRESS-META_VIRTUAL_ADDRESS]) = 0;
 
     // Create the paging structures and get the addess of the page tables
-    setupProcessPageStructureForUserProcess(&upi->psi);
-    upi->psi.pageTables = (uint64_t*)MIRRORAREA(upi->psi.pageTables);
+    upi->psi.pml4 = setupProcessPageStructureForUserProcess();
     upi->lastProgramAddress = 0;
 
     // Create the virtual mapping
@@ -165,7 +166,7 @@ void destroyProcessMemory(uint64_t pml4)
     // pages, but I prefer to leave the control here. We can
     // validate that the page is not a mirror page etc..
 
-    for (virtualAddress = THREAD_CODE_START; virtualAddress < MAX_RAM; virtualAddress += 0x1000)
+    for (virtualAddress = THREAD_CODE_START; virtualAddress < ram_end; virtualAddress += 0x1000)
     {
         uint64_t phys = (uint64_t)virt2phys(virtualAddress,pml4);
         uint64_t pageFlags = phys&0x8000000000000FFF;

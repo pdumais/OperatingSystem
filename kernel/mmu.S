@@ -66,7 +66,10 @@ allocatePhysicalPages:
     mov     $PAGETABLES,%rdx
     btsq    $MIRROR_BIT,%rdx
     sub     $8,%rdx
-    mov     $((MAX_RAM-KERNEL_RESERVED_END)/4096),%rcx
+
+    mov     ram_end,%rcx
+    sub     $KERNEL_END,%rcx
+    shr     $12,%rcx
 searchFreePage:
     add     $8,%rdx
 
@@ -361,8 +364,6 @@ setupProcessPageStructureForUserProcess:
     push        %r9
 
     call        setupProcessPageStructure
-    mov         %r8,(%rdi)
-    mov         %r9,8(%rdi)
 
     pop         %r9
     pop         %r8
@@ -381,25 +382,15 @@ setupProcessPageStructureForUserProcess:
 //      r9 = 4k pagetable start 
 ////////////////////////////////////////////////////////////////////////////////////
 setupProcessPageStructure:
-    push    %rax
     push    %rdi
     push    %rsi
     push    %rdx 
 
-    mov     $RAM_COUNT_GIG,%rdi
-    sub     $8,%rsp
-    mov     %rsp,%rsi
-    sub     $8,%rsp
-    mov     %rsp,%rdx
     call    setup_process_page_structure
-    mov     8(%rsp),%r8
-    mov     (%rsp),%r9
-    add     $16,%rsp
 
     pop     %rdx
     pop     %rsi
     pop     %rdi
-    pop     %rax
     ret
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -481,7 +472,7 @@ destroyTable:
     // If the table belongs in kernel memory, it means that this is a reused table
     // and we should not destroy it. For example, the 256th gig mirror are
     // page directories create in kernel mem and reused by all processes.
-    cmp         $KERNEL_RESERVED_END,%rdi
+    cmp         $KERNEL_END,%rdi
     jb          2f
 
     inc         %rsi
@@ -528,7 +519,9 @@ calculateMemoryUsage:
     mov         $PAGETABLES,%rdi
     btsq        $MIRROR_BIT,%rdi
     
-    mov         $((PAGETABLES_END-PAGETABLES)/8),%rcx
+    mov         ram_end,%rcx
+    sub         $KERNEL_END,%rcx
+    shr         $12,%rcx
 1:  testq       $0b111000000000,(%rdi)
     jz          2f
     inc         %rax  

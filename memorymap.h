@@ -1,9 +1,3 @@
-#define RAM_COUNT_GIG 16
-#ifdef __ASSEMBLER__
-#define MAX_RAM (RAM_COUNT_GIG*1024*1024*1024)
-#else
-#define MAX_RAM ((RAM_COUNT_GIG)*(1024LL)*(1024LL)*(1024LL))
-#endif
 
 #define TSS             0x00000500
 #define SOFTIRQLIST     0x00000600
@@ -42,12 +36,6 @@
 // Anything below, is mapped in user process
 #define PDTABLE         KERNEL_END     // need to be 4k aligned. enough space for 512 tables
 #define PAGETABLES      (PDTABLE+0x00200000)
-#define PAGETABLES_SIZE ((MAX_RAM/4096)*8)
-#define PAGETABLES_END  (PAGETABLES+PAGETABLES_SIZE-1)
-
-// this is where available pages will start.
-// Everything over is 4k pages
-#define KERNEL_RESERVED_END (PAGETABLES_END+1)
 
 
 ////////////////////////////////////////////////////
@@ -56,7 +44,12 @@
 ////////////////////////////////////////////////////
 ////////////////////////////////////////////////////
 #define THREAD_CODE_START 0x02000000
-#define META_VIRTUAL_ADDRESS         ((MAX_RAM)-0x2000000) 
+#ifdef __ASSEMBLER__
+#define TOP_VIRTUAL 0xFFFFFFFF00000000
+#else
+#define TOP_VIRTUAL 0xFFFFFFFF00000000LL
+#endif
+#define META_VIRTUAL_ADDRESS         ((TOP_VIRTUAL)-0x2000000) 
 #define STACK0TOP_VIRTUAL_ADDRESS    (META_VIRTUAL_ADDRESS) //this can't be more than 4pages since ring3 stack top is 16k below it
 #define STACK3TOP_VIRTUAL_ADDRESS    (STACK0TOP_VIRTUAL_ADDRESS-0x4000) 
 #define STACK3_DEPTH (20*1024*1024)

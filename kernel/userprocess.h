@@ -6,7 +6,6 @@
 struct ProcessStructureInfo
 {
     uint64_t* pml4;
-    uint64_t* pageTables;
 };
 
 struct UserProcessInfo
