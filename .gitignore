@@ -3,3 +3,8 @@ todo
 *.out
 t
 *.bak
+*.a
+*.img
+*.inc
+qemu.log
+userapps/appsbin/

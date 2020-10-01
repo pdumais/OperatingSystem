@@ -3,7 +3,7 @@ OBJC=printf.o pci.o rtl8139.o netcard.o arp.o arpcache.o ip.o icmp.o ip_routing.
 SOURCEC=$(OBJC:.o=.c)
 OBJASM=boot.o kernelmain.o interrupts.o scheduler.o helpers.o mutex.o mmu.o hardware.o apic.o intA0.o heap.o cmos.o vmx.o guest.o video_s.o timer.o
 SOURCEASM=$(OBJASM:.o=.S)
-CFLAGS=-fno-zero-initialized-in-bss -Wno-pointer-to-int-cast -ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -Wimplicit-function-declaration -Werror=implicit-function-declaration
+CFLAGS=-fno-zero-initialized-in-bss -Wno-pointer-to-int-cast -ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -Wimplicit-function-declaration -Werror=implicit-function-declaration -fno-pie
 PFLAGS=-DPCID
 
 .c.o:
@@ -21,5 +21,5 @@ kernel: $(OBJASM) $(OBJC)
 	wc -c < kernel.o >> ../sizekernel.inc
 	
 clean:
-	rm *.o	
+	-rm -f *.o	
 

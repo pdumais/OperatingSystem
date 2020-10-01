@@ -16,14 +16,12 @@ image:
 
 .PHONY: net
 net:
-	/usr/sbin/tunctl -t tap100
-	/usr/sbin/tunctl -t tap200
-	/sbin/ifconfig tap100 0.0.0.0 promisc up
-	/sbin/ifconfig tap200 0.0.0.0 promisc up
-	-/usr/local/bin/ovs-vsctl del-port br0 tap100 > /dev/null 2>&1
-	/usr/local/bin/ovs-vsctl add-port br0 tap100
+	sudo tunctl -t tap100
+	sudo tunctl -t tap200
+	sudo ifconfig tap100 0.0.0.0 promisc up
+	sudo ifconfig tap200 0.0.0.0 promisc up
 run: net
-	qemu-system-x86_64 --enable-kvm -cpu host -smp 4 -option-rom sgabios.bin \
+	sudo qemu-system-x86_64 --enable-kvm -cpu host -smp 4 -option-rom sgabios.bin \
 		-m 8192 -rtc base=localtime \
 		-monitor stdio -curses \
 		-drive file=image/disk.img,if=ide \
@@ -33,7 +31,7 @@ run: net
 #		-net nic,model=rtl8139,macaddr=52:54:00:12:34:61 -net tap,vlan=1,ifname=tap1,script=no \
 
 test: net
-	qemu-system-x86_64 --enable-kvm -cpu host -smp 4 -option-rom sgabios.bin \
+	sudo qemu-system-x86_64 --enable-kvm -cpu host -smp 4 -option-rom sgabios.bin \
 		-m 8192 -rtc base=localtime \
 		-monitor telnet:127.0.0.1:2048,server,nowait,ipv4 -curses \
 		-drive file=image/disk.img,if=ide \
@@ -43,7 +41,7 @@ test: net
 #		-net nic,model=rtl8139,macaddr=52:54:00:12:34:61 -net tap,vlan=1,ifname=tap1,script=no \
 
 server: net
-	qemu-system-x86_64 --enable-kvm -cpu host -smp 4 -option-rom sgabios.bin \
+	sudo qemu-system-x86_64 --enable-kvm -cpu host -smp 4 -option-rom sgabios.bin \
 		-m 4096 -rtc base=localtime \
 		--daemonize \
 		-drive file=image/disk.img,if=ide \
@@ -62,6 +60,8 @@ server: net
 clean:
 	cd kernel && make clean
 	cd userapps && make clean
+	-rm -f sizekernel.inc
+	-rm -f image/*
 
 disasm:
 	#objdump -D -b binary -mi386 -M x86-64 kernel/kernel.o 
