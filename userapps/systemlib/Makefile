@@ -12,5 +12,5 @@ $(TARGET).a: $(OBJECTS)
 	ar rcs systemlib.a $(OBJECTS)
 
 clean:
-	-rm *.o
-	-rm *.a
+	-rm -f *.o
+	-rm -f *.a

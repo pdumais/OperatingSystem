@@ -16,4 +16,5 @@ apps: systemlib $(BINS)
 
 clean:
 	 cd systemlib && make clean
-	 rm -Rf appsbin
+	 -rm -Rf appsbin
+	 -rm -f disk.img
